@@ -16,7 +16,8 @@
     "vercel-build": "prisma migrate deploy && next build",
     "ingest": "tsx scripts/ingest.ts",
     "verify:ingest": "tsx scripts/verify-ingest.ts",
-    "retag": "tsx scripts/retag.ts"
+    "retag": "tsx scripts/retag.ts",
+    "verify:onboarding": "tsx scripts/verify-onboarding.ts"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.2.0",
