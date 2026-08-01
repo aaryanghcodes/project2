@@ -36,6 +36,14 @@ import type { NewsSource, RawArticle } from "@/lib/news/types";
  * deviations. That is scale-free, which also means it survives a change of
  * embedding model far better than a hand-set constant would.
  *
+ * Measured outcome of the switch, same 722 articles: untagged went 172 → 200
+ * and every interest's tag count fell (Soccer 100 → 95, Asia 91 → 77), while
+ * mean confidence rose slightly across the board. So it trimmed the weakest
+ * tags — precision up, recall marginally down. Worth being honest that this
+ * is a modest aggregate change; the real argument for it is robustness, not a
+ * step change in quality. There is no labelled ground truth here, so tuning
+ * TOPIC_Z further would be guessing.
+ *
  * Re-check `npm run verify:ingest` after touching either value. Tagging only
  * runs at ingest, so `npm run retag` is what applies a change to articles
  * already stored.
