@@ -19,21 +19,36 @@ Neon is Postgres with `pgvector` available, and its free tier is enough here.
    postgresql://user:password@ep-something-123456.us-east-2.aws.neon.tech/neondb?sslmode=require
    ```
 
-4. Open the **SQL Editor** in the Neon dashboard and run:
-
-   ```sql
-   CREATE EXTENSION IF NOT EXISTS vector;
-   ```
-
-   This must happen before the first deploy — the migration creates
-   `vector(384)` columns and will fail if the extension is missing.
+Nothing else to do in the dashboard — the first migration runs
+`CREATE EXTENSION IF NOT EXISTS vector` itself.
 
 > Supabase works identically if you prefer it. Use the **session pooler**
 > connection string, not the direct one.
 
 ---
 
-## 2. Deploy — Vercel
+## 2. Give the connection string to GitHub
+
+Do this before deploying, because it is also what the ingestion cron uses.
+
+In the repo: **Settings → Secrets and variables → Actions → New repository
+secret**. Name it `DATABASE_URL`, paste the Neon string, save.
+
+Keep the string out of chat logs, commits, and screenshots — it contains the
+database password in plain text. GitHub masks it in workflow output.
+
+Then run the setup workflow: **Actions → Set up database → Run workflow**, type
+`setup` to confirm. It applies migrations, embeds the interest catalog with the
+real model, and does a first ingest. Takes a few minutes on the first run while
+the model downloads.
+
+Read the **Verify** step's output when it finishes. It prints the similarity
+distributions that topic tagging and story clustering depend on, and those
+thresholds are still provisional — see the note at the end of this file.
+
+---
+
+## 3. Deploy — Vercel
 
 1. Go to <https://vercel.com> and sign up with GitHub.
 2. **Add New → Project**, and import `aaryanghcodes/project2`.
@@ -57,35 +72,22 @@ Neon is Postgres with `pgvector` available, and its free tier is enough here.
 
 5. Deploy. You get a URL like `project2-xyz.vercel.app`.
 
-At this point signup and login work, and the app is live. The feed is still
-empty — that's the next step.
+Signup and login now work against the same database the setup workflow
+prepared, and the interest catalog is already populated.
 
 ---
 
-## 3. Seed the interest catalog
+## 4. Confirm ingestion is running
 
-The catalog needs to be embedded and written once. Easiest from your own
-machine, pointed at the production database:
+The `Ingest articles` workflow runs every 30 minutes on its own once
+`DATABASE_URL` is set. Check the Actions tab after the first hour: each run
+logs how many articles were fetched, how many were new, and how many were
+duplicates. A healthy steady state is a large `fetched` and a small `new` —
+that means dedupe is doing its job.
 
-```bash
-git clone https://github.com/aaryanghcodes/project2.git
-cd project2
-npm install
-
-# Paste the SAME Neon connection string here
-echo 'DATABASE_URL="postgresql://...your-neon-url..."' > .env
-
-npm run db:seed
-```
-
-First run downloads the embedding model (~130MB) and takes a minute or two.
-When it prints `Done. 44 interests ready.`, reload your Vercel URL — the
-signed-in page will show 44 interests in the catalog.
-
-> If your network blocks `huggingface.co`, prefix with
-> `EMBEDDING_PROVIDER=hashed` to seed anyway. Do this only to unblock yourself;
-> the vectors it produces are lexical, not semantic, and should be re-seeded
-> properly later.
+A run where every feed fails is treated as a failure rather than a quiet no-op,
+so a blanket block or a DNS problem turns the workflow red instead of leaving
+the database silently stale.
 
 ---
 

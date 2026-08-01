@@ -1,0 +1,93 @@
+# One-time (and re-runnable) database setup.
+#
+# This exists so the production connection string never has to leave GitHub.
+# It also has to run here rather than locally for a practical reason: seeding
+# computes real embeddings, which needs huggingface.co, and needs to happen
+# under the same embedding provider that ingestion will use. Mixing providers
+# produces similarity scores that look fine and mean nothing.
+#
+# Run from the Actions tab → "Set up database" → Run workflow.
+name: Set up database
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "setup" to confirm — this writes to the production database'
+        required: true
+        default: ""
+      ingest:
+        description: "Also run a first ingest after seeding"
+        type: boolean
+        default: true
+
+concurrency:
+  group: db-setup
+  cancel-in-progress: false
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check confirmation
+        if: inputs.confirm != 'setup'
+        run: |
+          echo "::error::Confirmation not given. Re-run and type 'setup' in the confirm box."
+          exit 1
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Cache embedding model
+        uses: actions/cache@v4
+        with:
+          path: .model-cache
+          key: embedding-model-${{ hashFiles('package-lock.json') }}
+          restore-keys: embedding-model-
+
+      - run: npm ci
+
+      - name: Check database secret is present
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::DATABASE_URL secret is not set. Add it under"
+            echo "::error::Settings → Secrets and variables → Actions → New repository secret."
+            exit 1
+          fi
+
+      # Creates the pgvector extension and every table. Safe to re-run: applied
+      # migrations are skipped.
+      - name: Apply migrations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: npx prisma migrate deploy
+
+      # Embeds the 44-interest catalog with the real model. Re-running is safe
+      # and is REQUIRED after any change to an interest description.
+      - name: Seed interest catalog
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: npm run db:seed
+
+      - name: First ingest
+        if: inputs.ingest
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: npm run ingest
+
+      # The important step. Prints the similarity distributions that the
+      # tagging and clustering thresholds depend on — those thresholds are
+      # provisional, and this output is how they get validated for real.
+      - name: Verify
+        if: always()
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: npm run verify:ingest
