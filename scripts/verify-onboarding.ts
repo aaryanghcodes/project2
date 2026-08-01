@@ -128,6 +128,15 @@ async function main(): Promise<void> {
     );
 
     if (pos.length === 0) throw new Error("No positive centroids after completion.");
+
+    // Dislikes were recorded, so the negative side must exist too. Without
+    // this the aversion term in scoring is silently always zero, and the feed
+    // never learns what to stop showing.
+    if (neg.length === 0) {
+      throw new Error(
+        "Dislikes were recorded but produced no negative centroids.",
+      );
+    }
     for (const centroid of centroids) {
       if (centroid.vector.length !== 384) {
         throw new Error(`Centroid ${centroid.idx} has ${centroid.vector.length} dims, expected 384.`);
