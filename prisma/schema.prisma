@@ -1,0 +1,194 @@
+// Personalized news feed — data model.
+// See PLAN.md §3 for the reasoning behind this schema.
+//
+// Embedding columns use Unsupported("vector(384)") because Prisma has no native
+// vector type. They are nullable by necessity: Prisma Client cannot write
+// Unsupported columns, so every vector is written and read through raw SQL
+// (see src/lib/vector.ts). Dimension 384 matches bge-small-en-v1.5.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum OnboardingState {
+  INTERESTS
+  CALIBRATION
+  COMPLETE
+}
+
+enum InterestSource {
+  ONBOARDING
+  INFERRED
+}
+
+enum InteractionType {
+  LIKE
+  DISLIKE
+  CLICK
+  DWELL
+  SAVE
+  HIDE
+}
+
+enum InteractionContext {
+  ONBOARDING
+  FEED
+}
+
+enum CentroidPolarity {
+  POS
+  NEG
+}
+
+model User {
+  id              String          @id @default(cuid())
+  email           String          @unique
+  passwordHash    String?         @map("password_hash")
+  name            String?
+  imageUrl        String?         @map("image_url")
+  onboardingState OnboardingState @default(INTERESTS) @map("onboarding_state")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  interests    UserInterest[]
+  interactions Interaction[]
+  centroids    UserTasteCentroid[]
+  impressions  Impression[]
+
+  @@map("users")
+}
+
+/// The checkbox catalog shown during onboarding. `description` is the sentence
+/// we embed to produce `seedEmbedding` — it is not shown to users, so it is
+/// written to describe the topic densely for the embedding model.
+model Interest {
+  id          String  @id @default(cuid())
+  slug        String  @unique
+  label       String
+  description String
+  group       String  @map("interest_group")
+  sortOrder   Int     @map("sort_order")
+  emoji       String?
+
+  seedEmbedding Unsupported("vector(384)")? @map("seed_embedding")
+
+  users  UserInterest[]
+  topics ArticleTopic[]
+
+  @@index([group, sortOrder])
+  @@map("interests")
+}
+
+model UserInterest {
+  userId     String         @map("user_id")
+  interestId String         @map("interest_id")
+  weight     Float          @default(1.0)
+  source     InterestSource @default(ONBOARDING)
+  createdAt  DateTime       @default(now()) @map("created_at")
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  interest Interest @relation(fields: [interestId], references: [id], onDelete: Cascade)
+
+  @@id([userId, interestId])
+  @@map("user_interests")
+}
+
+model Article {
+  id             String   @id @default(cuid())
+  urlHash        String   @unique @map("url_hash")
+  url            String
+  sourceName     String   @map("source_name")
+  author         String?
+  title          String
+  description    String?
+  contentSnippet String?  @map("content_snippet")
+  imageUrl       String?  @map("image_url")
+  publishedAt    DateTime @map("published_at")
+  fetchedAt      DateTime @default(now()) @map("fetched_at")
+  lang           String   @default("en")
+  qualityScore   Float    @default(0.5) @map("quality_score")
+
+  /// Articles telling the same story share a cluster id so the feed shows one
+  /// card instead of twelve. Assigned at ingest by cosine similarity.
+  storyClusterId String? @map("story_cluster_id")
+
+  embedding Unsupported("vector(384)")?
+
+  topics       ArticleTopic[]
+  interactions Interaction[]
+  impressions  Impression[]
+
+  @@index([publishedAt(sort: Desc)])
+  @@index([storyClusterId])
+  @@map("articles")
+}
+
+model ArticleTopic {
+  articleId  String @map("article_id")
+  interestId String @map("interest_id")
+  confidence Float
+
+  article  Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  interest Interest @relation(fields: [interestId], references: [id], onDelete: Cascade)
+
+  @@id([articleId, interestId])
+  @@index([interestId])
+  @@map("article_topics")
+}
+
+model Interaction {
+  id        String             @id @default(cuid())
+  userId    String             @map("user_id")
+  articleId String             @map("article_id")
+  type      InteractionType
+  dwellMs   Int?               @map("dwell_ms")
+  context   InteractionContext @default(FEED)
+  createdAt DateTime           @default(now()) @map("created_at")
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, articleId, type])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("interactions")
+}
+
+/// A user's taste profile: up to 6 positive and 3 negative centroids. A single
+/// averaged vector cannot represent someone interested in both quantum
+/// computing and the NBA, so we keep several and score on the best match.
+model UserTasteCentroid {
+  userId       String           @map("user_id")
+  polarity     CentroidPolarity
+  idx          Int
+  weight       Float            @default(1.0)
+  articleCount Int              @default(0) @map("article_count")
+  updatedAt    DateTime         @updatedAt @map("updated_at")
+
+  vector Unsupported("vector(384)")?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, polarity, idx])
+  @@map("user_taste_centroids")
+}
+
+/// Every article shown to a user, so the feed never repeats itself.
+model Impression {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  articleId String   @map("article_id")
+  position  Int
+  sessionId String?  @map("session_id")
+  shownAt   DateTime @default(now()) @map("shown_at")
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, articleId])
+  @@map("impressions")
+}

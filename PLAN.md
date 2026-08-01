@@ -24,17 +24,42 @@ Sign up  →  Pick interests (grid of checkboxes, min 3)
 
 ## 2. Stack
 
+Constraint: **no paid APIs.** Every dependency below is free at our scale, and
+the whole thing runs on free hosting tiers. This is the "MVP to demo" build.
+
 | Layer | Choice | Notes |
 |---|---|---|
 | Framework | Next.js 15, App Router, TypeScript | UI + API routes in one codebase |
-| DB | Postgres + `pgvector` | Neon or Supabase; pgvector for similarity search |
-| ORM | Prisma | `Unsupported("vector(1536)")` for embedding columns, raw SQL for ANN queries |
-| Auth | Auth.js (NextAuth) | Email/password + Google OAuth |
+| DB | Postgres + `pgvector` | Neon or Supabase free tier; Docker locally |
+| ORM | Prisma | `Unsupported("vector(384)")` for embedding columns, raw SQL for ANN queries |
+| Auth | Auth.js v5 (credentials) | Email/password, bcrypt, JWT sessions |
 | Styling | Tailwind + shadcn/ui | Fast, good defaults for card/grid UI |
-| News source | NewsAPI.org | See §4 for the tier problem |
-| Embeddings | OpenAI `text-embedding-3-small` | 1536 dims, ~$0.02/1M tokens |
-| Jobs | Vercel Cron | Ingestion every 30 min |
-| Hosting | Vercel | |
+| News source | Curated RSS/Atom feeds | Free, unlimited, no key — see §4 |
+| Embeddings | `bge-small-en-v1.5` via Transformers.js | Runs locally, 384 dims, no API key |
+| Jobs | GitHub Actions cron | Free; see the note on why not Vercel Cron |
+| Hosting | Vercel free tier | |
+
+### Consequences of going key-free
+
+**Embeddings run in-process, not over HTTP.** `@xenova/transformers` runs
+`bge-small-en-v1.5` as ONNX on the CPU. It's a strong English retrieval model
+that punches well above its 33M parameters, and at 384 dimensions the vectors
+are a quarter the size of OpenAI's — smaller index, faster search, less storage.
+Quality is a step below `text-embedding-3-small` but comfortably good enough for
+topic-level personalization, and swapping to a hosted model later is a one-file
+change behind the `embed()` interface.
+
+**Ingestion can't run on Vercel Cron.** The model weights are ~130MB, which
+blows past the serverless bundle limit and would cold-start on every invocation.
+So ingestion runs as a standalone Node script on a **GitHub Actions schedule**,
+writing straight to Postgres. Free, no timeout pressure, and the model gets
+cached between runs. The web app never loads the model except for the rare
+on-demand embed.
+
+**One demo-critical implication:** because this is an investor/team demo, the
+database must never look empty. The seed script ships with a checked-in fixture
+set of articles so a fresh clone has a populated, believable feed on first run,
+independent of whether the RSS cron has ever fired.
 
 ---
 
@@ -50,7 +75,7 @@ CREATE EXTENSION IF NOT EXISTS vector;
 
 **interests** — the checkbox catalog. `id`, `slug`, `label`, `group` (Tech,
 Science, Business, Health, Sports, Politics, World, Culture, …),
-`seed_embedding vector(1536)`, `sort_order`
+`seed_embedding vector(384)`, `sort_order`
 
 Ship ~40 interests across ~9 groups. Each one's `seed_embedding` is the
 embedding of a short descriptive sentence ("News about artificial intelligence,
@@ -62,7 +87,7 @@ articles actually tagged with it.
 
 **articles** — `id`, `url_hash` (unique, sha256 of normalized URL), `url`,
 `source_name`, `author`, `title`, `description`, `content_snippet`,
-`image_url`, `published_at`, `fetched_at`, `lang`, `embedding vector(1536)`,
+`image_url`, `published_at`, `fetched_at`, `lang`, `embedding vector(384)`,
 `story_cluster_id` (nullable), `quality_score` (float)
 
 **article_topics** — `article_id`, `interest_id`, `confidence`. Derived by
@@ -75,7 +100,7 @@ seeing this" labels.
 `feed`), `created_at`. Unique on `(user_id, article_id, type)`.
 
 **user_taste_centroids** — `user_id`, `idx`, `polarity` (`pos` | `neg`),
-`vector vector(1536)`, `weight`, `article_count`, `updated_at`.
+`vector vector(384)`, `weight`, `article_count`, `updated_at`.
 This is the user's taste profile — see §5.
 
 **impressions** — `user_id`, `article_id`, `shown_at`, `position`,
@@ -94,14 +119,17 @@ CREATE INDEX ON interactions (user_id, created_at DESC);
 
 ## 4. Ingestion pipeline
 
-Cron every 30 minutes:
+A standalone Node script (`scripts/ingest.ts`), run every 30 minutes by a
+GitHub Actions schedule and also runnable by hand:
 
-1. **Fetch** — NewsAPI `/v2/top-headlines` per category, plus `/v2/everything`
-   for keyword queries backing our narrower interests.
-2. **Normalize** — strip URL tracking params, hash, drop rows whose `url_hash`
-   already exists.
-3. **Embed** — batch the new articles (`title + ". " + description + ". " +
-   content_snippet`) into one embeddings request per 100 articles.
+1. **Fetch** — pull a curated list of ~60 English RSS/Atom feeds in parallel
+   with a concurrency cap, using `rss-parser`. Feeds live in a checked-in
+   config file grouped by interest, so adding coverage is a data change, not a
+   code change. Send `If-Modified-Since` / `ETag` and skip unchanged feeds.
+2. **Normalize** — strip URL tracking params (`utm_*`, `fbclid`), resolve
+   redirects, sha256 the cleaned URL, drop rows whose `url_hash` exists.
+3. **Embed** — batch new articles (`title + ". " + description + ". " +
+   content_snippet`) through the local model, 32 at a time.
 4. **Tag** — cosine-compare against interest seed embeddings, write the top 3
    above threshold into `article_topics`.
 5. **Cluster** — group articles with pairwise cosine > 0.92 into a
@@ -109,28 +137,29 @@ Cron every 30 minutes:
    card.
 6. **Prune** — delete articles older than 30 days.
 
-### ⚠️ The NewsAPI constraint — decide before launch
+Everything from step 2 onward is source-agnostic. The fetcher sits behind a
+`NewsSource` interface, so if you ever want to add a paid API alongside RSS it
+plugs in without touching the pipeline.
 
-The free tier is **development-only**, capped around 100 requests/day, and
-articles are **delayed 24 hours**. That's workable for building, and delayed
-articles are fine while we're testing ranking, but it does not support a live
-product. Before any real users:
+### Why RSS is genuinely fine here
 
-- **Option A** — NewsAPI paid tier (~$449/mo Business). Zero code change.
-- **Option B** — swap the fetch step for a curated RSS/Atom ingester. Free and
-  unlimited, and everything downstream of step 2 is unchanged because the
-  pipeline is source-agnostic by design. Roughly 2-3 days of work.
+It's not a downgrade forced by budget. RSS gives us **no rate limits, no key
+rotation, no vendor dependency, and no 24-hour delay** — feeds carry stories
+within minutes of publication, which is better than NewsAPI's free tier offered.
+The real costs are that we curate the source list ourselves, and that feed
+quality varies (some outlets publish title-only items with no description).
 
-I'd build against NewsAPI now and keep the fetcher behind a `NewsSource`
-interface so B is a drop-in. Revisit at the end of Phase 1.
+Two things to handle because of that variance:
+- Items with a description under ~120 characters embed poorly. Fetch the page's
+  Open Graph description as a fallback, and skip the item if that's also thin.
+- Some feeds paginate poorly or replay old items. The `url_hash` dedupe absorbs
+  this, but cap per-feed intake per run so one misbehaving feed can't flood.
 
 **Licensing:** store and display title, description, a short snippet, image, and
-a link to the original. Do not store or serve full article bodies, and keep
-source attribution on every card. This is both NewsAPI's terms and the safe
-copyright posture generally.
-
-**Cost sanity check:** ~1,000 articles/day × ~200 tokens ≈ 200k tokens/day ≈
-**$0.004/day** in embeddings. Not a factor.
+a link to the original. Never store or serve full article bodies, and keep
+source attribution and an outbound link on every card. RSS being publicly
+published doesn't grant redistribution rights to full text — headline, snippet,
+and link is the defensible posture.
 
 ---
 
@@ -244,15 +273,16 @@ POST   /api/cron/ingest               cron-secret protected
 ## 8. Build phases
 
 **Phase 0 — Foundation (~2 days)**
-Next.js scaffold, Prisma + pgvector migrations, Auth.js with email + Google,
-seed the 40-interest catalog and embed the seeds. *Done when:* a user can sign
-up, log in, and hit an empty authenticated page.
+Next.js scaffold, Prisma + pgvector migrations, Auth.js email/password, local
+embedding module, seed the 40-interest catalog with computed embeddings.
+*Done when:* a user can sign up, log in, and hit an empty authenticated page,
+and the interest catalog is in the database with real vectors.
 
 **Phase 1 — Ingestion (~3 days)**
-`NewsSource` interface + NewsAPI implementation, normalize/dedupe, batch
-embedding, topic tagging, story clustering, cron route. *Done when:* the
-articles table fills automatically every 30 min with embeddings and topics
-populated. **Decide the NewsAPI tier question here.**
+`NewsSource` interface + RSS implementation, curated feed list, normalize and
+dedupe, batch embedding, topic tagging, story clustering, GitHub Actions cron.
+*Done when:* the articles table fills automatically every 30 min with embeddings
+and topics populated, and a checked-in fixture set guarantees a non-empty demo.
 
 **Phase 2 — Onboarding (~3 days)**
 Interest picker, stratified + MMR calibration feed, interaction recording,
@@ -281,7 +311,9 @@ product is real.
 
 | Risk | Mitigation |
 |---|---|
-| NewsAPI free tier can't serve live users | `NewsSource` interface; RSS fallback costed at 2-3 days |
+| RSS feed quality varies; thin descriptions embed badly | Open Graph fallback, skip items still too thin, cap per-feed intake |
+| Local embeddings are weaker than hosted ones | Behind an `embed()` interface; swap to a hosted model is one file if quality disappoints |
+| Demo database looks empty if cron hasn't run | Checked-in article fixtures seeded on setup |
 | Cold start feels generic before calibration | Seed centroids from interest embeddings at checkbox time, not after |
 | Filter bubble / feed goes stale | 15% exploration slots, measured against like rate |
 | Same story from 12 outlets floods feed | Story clustering at 0.92 cosine, one card per cluster |
@@ -299,3 +331,15 @@ product is real.
 
 None of these block Phase 0-2, so we can start building while you think about
 them.
+
+---
+
+## 10. Decisions on record
+
+| Decision | Choice | Date |
+|---|---|---|
+| Stack | Next.js + Postgres | 2026-08-01 |
+| Purpose | MVP to demo to investors/team — demo path quality over public-scale hardening | 2026-08-01 |
+| Paid APIs | None. RSS ingestion + local embedding model | 2026-08-01 |
+| Ranking | Embeddings + vector similarity, multi-centroid profile | 2026-08-01 |
+| Coverage | English, US-centric | 2026-08-01 |
