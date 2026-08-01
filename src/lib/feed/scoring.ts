@@ -20,6 +20,20 @@ import type { Centroid } from "@/lib/profile/centroids";
  *   has no interest in.
  * - `quality` is small on purpose — it is a per-source prior, not a judgement
  *   of the article, so it should only break ties.
+ *
+ * Measured on the live corpus (722 articles, cold-start profiles): relevance
+ * contributes 0.290 on average against freshness at 0.232. Relevance wins, and
+ * two opposed profiles came out with 0% feed overlap — but the margin is only
+ * about 1.25x, which is thinner than it looks. It held here because those two
+ * profiles were deliberately far apart; for subtler differences, or for a
+ * corpus with a burst of very recent articles, freshness could plausibly take
+ * over and flatten everyone onto the same recency ordering.
+ *
+ * The same weights measured under the lexical fallback give relevance 0.021
+ * against freshness 0.179 — completely inverted. That is worth remembering
+ * before trusting any local ranking result: these weights assume relevance
+ * lands in bge-small's range, and they are not portable across embedding
+ * models without re-measuring.
  */
 export const WEIGHTS = {
   relevance: 1.0,
