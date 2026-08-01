@@ -1,0 +1,56 @@
+# Acceptance checks against the real corpus.
+#
+# The local sandbox cannot reach huggingface.co, so its only embeddings are
+# the lexical fallback — under which cosine similarities are near zero and the
+# ranking checks are meaningless. These run where the articles and embeddings
+# are real.
+#
+# NOTE: each check creates throwaway users and deletes them again, including
+# on failure. Nothing else is written.
+name: Verify
+
+on:
+  workflow_dispatch:
+    inputs:
+      check:
+        description: "Which acceptance check to run"
+        type: choice
+        options: [all, onboarding, feed, ingest]
+        default: all
+
+concurrency:
+  group: verify
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Ingest check
+        if: inputs.check == 'all' || inputs.check == 'ingest'
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: npm run verify:ingest
+
+      - name: Onboarding acceptance (Phase 2)
+        if: inputs.check == 'all' || inputs.check == 'onboarding'
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: npm run verify:onboarding
+
+      - name: Feed acceptance (Phase 3)
+        if: inputs.check == 'all' || inputs.check == 'feed'
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: npm run verify:feed

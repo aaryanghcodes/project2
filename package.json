@@ -17,7 +17,8 @@
     "ingest": "tsx scripts/ingest.ts",
     "verify:ingest": "tsx scripts/verify-ingest.ts",
     "retag": "tsx scripts/retag.ts",
-    "verify:onboarding": "tsx scripts/verify-onboarding.ts"
+    "verify:onboarding": "tsx scripts/verify-onboarding.ts",
+    "verify:feed": "tsx scripts/verify-feed.ts"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.2.0",

@@ -3,6 +3,8 @@ import { z } from "zod";
 
 import { currentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { nudgeCentroidToward } from "@/lib/profile/centroids";
+import { parseSqlVector } from "@/lib/vector";
 
 const schema = z.object({
   articleId: z.string().min(1),
@@ -53,5 +55,24 @@ export async function POST(request: Request) {
     });
   });
 
-  return NextResponse.json({ ok: true });
+  // Feed ratings move the profile immediately, so the next page already
+  // reflects the feedback. Onboarding ratings are deliberately excluded: the
+  // whole calibration set is clustered in one pass at completion, and nudging
+  // during it would let the order the cards happened to appear in bias the
+  // result.
+  let profile: { updated: number | null; created: boolean } | null = null;
+  if (context === "FEED" && (type === "LIKE" || type === "DISLIKE")) {
+    const [row] = await db.$queryRaw<{ embedding: string | null }[]>`
+      SELECT embedding::text AS embedding FROM articles WHERE id = ${articleId}
+    `;
+    if (row?.embedding) {
+      profile = await nudgeCentroidToward(
+        user.id,
+        parseSqlVector(row.embedding),
+        type === "LIKE" ? "POS" : "NEG",
+      );
+    }
+  }
+
+  return NextResponse.json({ ok: true, profile });
 }

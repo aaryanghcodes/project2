@@ -7,7 +7,7 @@
  */
 
 import { db } from "@/lib/db";
-import { parseSqlVector, toSqlVector } from "@/lib/vector";
+import { cosineSimilarity, normalize, parseSqlVector, toSqlVector } from "@/lib/vector";
 import { clusterCountFor, kmeans } from "./kmeans";
 
 export type Polarity = "POS" | "NEG";
@@ -188,6 +188,87 @@ export async function interactionVectors(
   `;
 
   return rows.map((row) => parseSqlVector(row.vector));
+}
+
+/**
+ * Nudge the profile toward a single newly-rated article, without a full refit.
+ *
+ * `c ← normalize(c + η(a - c))` against the nearest centroid of matching
+ * polarity, per PLAN.md §5. The learning rate decays as that centroid's
+ * article count grows, so early ratings move the profile decisively and later
+ * ones refine it — a centroid built from forty likes should not be yanked
+ * across embedding space by the forty-first.
+ *
+ * The floor on η matters as much as the decay: without it a long-established
+ * centroid becomes effectively frozen, and someone whose interests genuinely
+ * shift can never escape the profile they had a year ago.
+ */
+export async function nudgeCentroidToward(
+  userId: string,
+  articleEmbedding: number[],
+  polarity: Polarity,
+): Promise<{ updated: number | null; created: boolean }> {
+  const centroids = (await loadCentroids(userId)).filter(
+    (c) => c.polarity === polarity,
+  );
+
+  const max =
+    polarity === "POS" ? MAX_POSITIVE_CENTROIDS : MAX_NEGATIVE_CENTROIDS;
+
+  // First rating of this polarity, or room to spare and nothing close: the
+  // article becomes a centroid of its own rather than distorting an unrelated
+  // one. This is how a genuinely new interest gets represented at all.
+  let nearestIdx: number | null = null;
+  let nearestScore = -Infinity;
+  for (const centroid of centroids) {
+    const score = cosineSimilarity(articleEmbedding, centroid.vector);
+    if (score > nearestScore) {
+      nearestScore = score;
+      nearestIdx = centroid.idx;
+    }
+  }
+
+  const NEW_CENTROID_THRESHOLD = 0.3;
+  if (
+    centroids.length < max &&
+    (nearestIdx === null || nearestScore < NEW_CENTROID_THRESHOLD)
+  ) {
+    const idx = centroids.length;
+    await db.$executeRawUnsafe(
+      `INSERT INTO user_taste_centroids
+         (user_id, polarity, idx, weight, article_count, vector, updated_at)
+       VALUES ($1, $2::"CentroidPolarity", $3, $4, $5, $6::vector, now())
+       ON CONFLICT (user_id, polarity, idx) DO NOTHING`,
+      userId,
+      polarity,
+      idx,
+      0.5,
+      1,
+      toSqlVector(normalize(articleEmbedding)),
+    );
+    return { updated: null, created: true };
+  }
+
+  if (nearestIdx === null) return { updated: null, created: false };
+
+  const target = centroids.find((c) => c.idx === nearestIdx)!;
+  const eta = Math.max(0.05, 1 / (target.articleCount + 3));
+
+  const moved = normalize(
+    target.vector.map((v, i) => v + eta * (articleEmbedding[i] - v)),
+  );
+
+  await db.$executeRawUnsafe(
+    `UPDATE user_taste_centroids
+     SET vector = $1::vector, article_count = article_count + 1, updated_at = now()
+     WHERE user_id = $2 AND polarity = $3::"CentroidPolarity" AND idx = $4`,
+    toSqlVector(moved),
+    userId,
+    polarity,
+    nearestIdx,
+  );
+
+  return { updated: nearestIdx, created: false };
 }
 
 /**
