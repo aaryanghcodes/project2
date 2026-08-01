@@ -1,0 +1,42 @@
+# Re-applies topic tagging to articles already in the database.
+#
+# Needed whenever TOPIC_THRESHOLD changes, because tagging otherwise happens
+# once at ingest — so a threshold change silently applies only to articles
+# that arrive after it. No model download and no re-embedding, so this is a
+# fast job.
+#
+# Run from the Actions tab → "Retag articles" → Run workflow.
+name: Retag articles
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: retag
+  cancel-in-progress: false
+
+jobs:
+  retag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Retag
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: npm run retag
+
+      - name: Verify
+        if: always()
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: npm run verify:ingest

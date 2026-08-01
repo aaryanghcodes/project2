@@ -18,19 +18,26 @@ import type { NewsSource, RawArticle } from "@/lib/news/types";
 /**
  * Minimum cosine similarity for an article to be tagged with an interest.
  *
- * PROVISIONAL. This is a starting value for bge-small-en-v1.5, not a measured
- * one: the sandbox this was written in cannot reach huggingface.co, so the
- * only embeddings available locally were the lexical fallback, whose
- * similarity scale is completely different (best interest match across the
- * fixture corpus: 0.21, where the real model would be expected around
- * 0.6-0.8). Validate against a real run before trusting it — see
- * `npm run verify:ingest`, which prints the distribution this should sit in.
+ * Measured, on a 722-article run against the live feed list: the
+ * best-matching interest per article has max 0.727, mean 0.541, p10 0.468.
  *
- * The direction of the trade, at least, is stable: too low attaches
- * plausible-sounding but wrong topics, which is worse than leaving an article
- * untagged, because vector retrieval can still find an untagged article.
+ * The first guess here was 0.55, which sat *above* the mean and left 421 of
+ * 722 articles (58%) with no topic at all — they stayed reachable by vector
+ * search but invisible to anything that reasons about topics. 0.50 sits
+ * between the p10 and the mean, which tags the clear majority while still
+ * excluding the tail of articles that genuinely match nothing in the catalog
+ * (a county cricket report, against a catalog whose nearest entry is Soccer).
+ *
+ * Re-check `npm run verify:ingest` after changing this: it prints both this
+ * distribution and the random-pair noise floor, and the threshold is only
+ * meaningful as a distance above that floor. Tagging only applies at ingest,
+ * so run `npm run retag` to apply a change to articles already stored.
+ *
+ * The trade is asymmetric: too low attaches plausible-sounding but wrong
+ * topics, which is worse than leaving an article untagged, because vector
+ * retrieval can still find an untagged article.
  */
-const TOPIC_THRESHOLD = 0.55;
+const TOPIC_THRESHOLD = 0.5;
 
 /** At most this many interests per article, best-scoring first. */
 const TOPIC_LIMIT = 4;

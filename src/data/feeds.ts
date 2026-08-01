@@ -18,6 +18,20 @@
  * aggregators and high-volume blogs lower — so that when two articles cover
  * the same story, the ranking layer has a tiebreaker that is not just
  * recency. It is a prior, not a verdict.
+ *
+ * Curation notes from the first live run (722 articles, 30 of 36 feeds
+ * succeeding): six entries were replaced after failing. Two returned 404, one
+ * served HTML rather than XML, and two rejected the request outright — the
+ * common thread being that consumer-lifestyle publishers are the most likely
+ * to sit behind bot protection. Replacements were drawn from domains that
+ * had already succeeded in the same run rather than from untested guesses,
+ * which is why The Guardian appears more often than editorial diversity would
+ * otherwise justify. Worth rebalancing once there is a way to test candidate
+ * feeds before committing them.
+ *
+ * Dropping ESPN leaves US sports thin; BBC Sport and the two Guardian sports
+ * feeds skew heavily toward football and cricket. If the demo audience cares
+ * about US leagues, that gap is worth closing deliberately.
  */
 
 export interface FeedSource {
@@ -156,16 +170,16 @@ export const FEEDS: FeedSource[] = [
     quality: 0.8,
   },
   {
-    id: "medical-news-today",
-    name: "Medical News Today",
-    url: "https://www.medicalnewstoday.com/rss",
+    id: "sciencedaily-health",
+    name: "ScienceDaily",
+    url: "https://www.sciencedaily.com/rss/health_medicine.xml",
     group: "Health",
-    quality: 0.6,
+    quality: 0.65,
   },
   {
-    id: "harvard-health",
-    name: "Harvard Health",
-    url: "https://www.health.harvard.edu/blog/feed",
+    id: "guardian-society",
+    name: "The Guardian",
+    url: "https://www.theguardian.com/society/rss",
     group: "Health",
     quality: 0.8,
   },
@@ -225,11 +239,11 @@ export const FEEDS: FeedSource[] = [
 
   // -------------------------------------------------------------------- Sports
   {
-    id: "espn",
-    name: "ESPN",
-    url: "https://www.espn.com/espn/rss/news",
+    id: "guardian-sport",
+    name: "The Guardian",
+    url: "https://www.theguardian.com/sport/rss",
     group: "Sports",
-    quality: 0.7,
+    quality: 0.75,
   },
   {
     id: "bbc-sport",
@@ -278,18 +292,18 @@ export const FEEDS: FeedSource[] = [
 
   // ----------------------------------------------------------------- Lifestyle
   {
-    id: "lifehacker",
-    name: "Lifehacker",
-    url: "https://lifehacker.com/feed/rss",
+    id: "npr-food",
+    name: "NPR",
+    url: "https://feeds.npr.org/1053/rss.xml",
     group: "Lifestyle",
-    quality: 0.55,
+    quality: 0.75,
   },
   {
-    id: "serious-eats",
-    name: "Serious Eats",
-    url: "https://www.seriouseats.com/feeds/all",
+    id: "guardian-food",
+    name: "The Guardian",
+    url: "https://www.theguardian.com/food/rss",
     group: "Lifestyle",
-    quality: 0.7,
+    quality: 0.75,
   },
   {
     id: "guardian-lifeandstyle",

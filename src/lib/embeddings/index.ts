@@ -25,9 +25,15 @@ export function activeProvider(): EmbeddingProvider {
   return process.env.EMBEDDING_PROVIDER === "hashed" ? "hashed" : "model";
 }
 
-// Weights are ~130MB. Downloaded once, then read from this directory, which is
-// what CI caches between ingest runs.
-process.env.TRANSFORMERS_CACHE ??= ".model-cache";
+/**
+ * Where the ~130MB of model weights live once downloaded. CI caches this
+ * directory between ingest runs, which matters at a 30-minute cadence.
+ *
+ * Applied via `env.cacheDir` below, not through TRANSFORMERS_CACHE — that is
+ * the Python library's variable and Transformers.js ignores it. Setting it
+ * looked like it worked and silently re-downloaded the model on every run.
+ */
+export const MODEL_CACHE_DIR = process.env.MODEL_CACHE_DIR ?? ".model-cache";
 
 type FeatureExtractor = (
   texts: string[],
@@ -44,7 +50,8 @@ let extractorPromise: Promise<FeatureExtractor> | null = null;
 async function getExtractor(): Promise<FeatureExtractor> {
   if (!extractorPromise) {
     extractorPromise = (async () => {
-      const { pipeline } = await import("@huggingface/transformers");
+      const { pipeline, env } = await import("@huggingface/transformers");
+      env.cacheDir = MODEL_CACHE_DIR;
       const pipe = await pipeline("feature-extraction", EMBEDDING_MODEL, {
         dtype: "fp32",
       });

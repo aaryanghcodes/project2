@@ -15,7 +15,8 @@
     "postinstall": "prisma generate",
     "vercel-build": "prisma migrate deploy && next build",
     "ingest": "tsx scripts/ingest.ts",
-    "verify:ingest": "tsx scripts/verify-ingest.ts"
+    "verify:ingest": "tsx scripts/verify-ingest.ts",
+    "retag": "tsx scripts/retag.ts"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.2.0",

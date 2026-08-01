@@ -72,11 +72,51 @@ async function main(): Promise<void> {
     ) s
   `;
 
+  // The noise floor. A threshold is only meaningful as a distance above the
+  // score an unrelated pair happens to get, and that floor is model-specific —
+  // bge-small compresses similarities into a much narrower band than the
+  // 0-to-1 range suggests, so 0.45 can be "unrelated" rather than "weak match".
+  // Sampled rather than exhaustive: the full cross join is articles × interests.
+  const [floor] = await db.$queryRaw<
+    { mean: number | null; p95: number | null }[]
+  >`
+    SELECT avg(sim) AS mean, percentile_cont(0.95) WITHIN GROUP (ORDER BY sim) AS p95
+    FROM (
+      SELECT 1 - (a.embedding <=> i.seed_embedding) AS sim
+      FROM (SELECT embedding FROM articles
+            WHERE embedding IS NOT NULL ORDER BY random() LIMIT 200) a
+      CROSS JOIN interests i
+      WHERE i.seed_embedding IS NOT NULL
+    ) s
+  `;
+
   if (match?.max != null) {
     console.log(
       `\nbest-matching interest per article — max ${match.max.toFixed(3)}  ` +
         `mean ${match.mean!.toFixed(3)}  p10 ${match.p10!.toFixed(3)}`,
     );
+
+    if (floor?.mean != null) {
+      const separation = match.mean! - floor.mean;
+      console.log(
+        `random article/interest pair  — mean ${floor.mean.toFixed(3)}  ` +
+          `p95 ${floor.p95!.toFixed(3)}   (noise floor)`,
+      );
+      console.log(
+        `separation (best mean − noise mean): ${separation.toFixed(3)}`,
+      );
+      console.log(
+        `  TOPIC_THRESHOLD should sit above the noise p95 (${floor.p95!.toFixed(3)}) ` +
+          `and below\n  the best-match mean (${match.mean!.toFixed(3)}).`,
+      );
+      if (separation < 0.08) {
+        console.warn(
+          `\n!! Best matches are barely above the noise floor. Topic tagging is\n` +
+            `   close to arbitrary at any threshold — the interest catalog may not\n` +
+            `   describe what these feeds actually publish.`,
+        );
+      }
+    }
 
     if (match.max < IMPLAUSIBLE_SIMILARITY) {
       console.warn(
