@@ -106,8 +106,11 @@ async function main(): Promise<void> {
         `separation (best mean − noise mean): ${separation.toFixed(3)}`,
       );
       console.log(
-        `  TOPIC_THRESHOLD should sit above the noise p95 (${floor.p95!.toFixed(3)}) ` +
-          `and below\n  the best-match mean (${match.mean!.toFixed(3)}).`,
+        `  Any absolute cutoff would have to fit between the noise p95 ` +
+          `(${floor.p95!.toFixed(3)}) and the\n  best-match mean ` +
+          `(${match.mean!.toFixed(3)}) — a ${(match.mean! - floor.p95!).toFixed(3)}-wide window. ` +
+          `Tagging uses a per-article\n  z-test instead, for exactly that reason; ` +
+          `TOPIC_FLOOR only backstops it.`,
       );
       if (separation < 0.08) {
         console.warn(

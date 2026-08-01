@@ -21,23 +21,37 @@ import type { NewsSource, RawArticle } from "@/lib/news/types";
  * Measured, on a 722-article run against the live feed list: the
  * best-matching interest per article has max 0.727, mean 0.541, p10 0.468.
  *
- * The first guess here was 0.55, which sat *above* the mean and left 421 of
- * 722 articles (58%) with no topic at all — they stayed reachable by vector
- * search but invisible to anything that reasons about topics. 0.50 sits
- * between the p10 and the mean, which tags the clear majority while still
- * excluding the tail of articles that genuinely match nothing in the catalog
- * (a county cricket report, against a catalog whose nearest entry is Soccer).
+ * A *random* article/interest pair already scores 0.408 on average, with p95
+ * at 0.506. That leaves a usable window for a global cutoff roughly 0.035
+ * wide — between the noise p95 and the mean best match. Both guesses fell
+ * outside it: 0.55 sat above the mean and left 421 of 722 articles (58%)
+ * untagged, while 0.50 sat below the noise p95 and began admitting unrelated
+ * pairs.
  *
- * Re-check `npm run verify:ingest` after changing this: it prints both this
- * distribution and the random-pair noise floor, and the threshold is only
- * meaningful as a distance above that floor. Tagging only applies at ingest,
- * so run `npm run retag` to apply a change to articles already stored.
+ * A window that narrow is not something to tune more carefully; it means the
+ * instrument is wrong. bge-small compresses cosine similarity into a tight
+ * band, and where an article sits in that band shifts with its length,
+ * register, and subject. So the test is relative: an interest is tagged when
+ * it stands out from the other 43 *for this article*, measured in standard
+ * deviations. That is scale-free, which also means it survives a change of
+ * embedding model far better than a hand-set constant would.
  *
- * The trade is asymmetric: too low attaches plausible-sounding but wrong
- * topics, which is worse than leaving an article untagged, because vector
- * retrieval can still find an untagged article.
+ * Re-check `npm run verify:ingest` after touching either value. Tagging only
+ * runs at ingest, so `npm run retag` is what applies a change to articles
+ * already stored.
+ *
+ * The trade is asymmetric: too permissive attaches plausible-sounding but
+ * wrong topics, which is worse than leaving an article untagged, because
+ * vector retrieval can still find an untagged article.
  */
-const TOPIC_THRESHOLD = 0.5;
+const TOPIC_Z = 1.5;
+
+/**
+ * Absolute backstop, set at the measured noise p95. Catches the degenerate
+ * case where an article is equally unrelated to everything in the catalog —
+ * something is still 1.5σ above the rest there, and it means nothing.
+ */
+const TOPIC_FLOOR = 0.506;
 
 /** At most this many interests per article, best-scoring first. */
 const TOPIC_LIMIT = 4;
@@ -169,26 +183,40 @@ export async function embedAndStore(articles: RawArticle[]): Promise<string[]> {
 export async function tagTopics(articleIds: string[]): Promise<number> {
   if (articleIds.length === 0) return 0;
 
+  // The inner subquery scores this article against every interest and, via the
+  // window functions, computes that article's own mean and spread in the same
+  // pass. The outer filter then keeps only interests standing out from the
+  // article's own distribution, rather than clearing a global line.
   return db.$executeRawUnsafe(
     `INSERT INTO article_topics (article_id, interest_id, confidence)
      SELECT a.id, t.interest_id, t.confidence
      FROM articles a
      CROSS JOIN LATERAL (
-       SELECT i.id AS interest_id,
-              1 - (a.embedding <=> i.seed_embedding) AS confidence
-       FROM interests i
-       WHERE i.seed_embedding IS NOT NULL
-       ORDER BY a.embedding <=> i.seed_embedding
-       LIMIT $2
+       SELECT s.interest_id, s.confidence
+       FROM (
+         SELECT i.id AS interest_id,
+                1 - (a.embedding <=> i.seed_embedding) AS confidence,
+                avg(1 - (a.embedding <=> i.seed_embedding)) OVER () AS mean,
+                stddev_pop(1 - (a.embedding <=> i.seed_embedding)) OVER () AS sd
+         FROM interests i
+         WHERE i.seed_embedding IS NOT NULL
+       ) s
+       -- A zero spread would make the z-test meaningless rather than strict,
+       -- so it is treated as "nothing stands out".
+       WHERE s.sd > 0
+         AND s.confidence >= s.mean + ($2 * s.sd)
+         AND s.confidence >= $3
+       ORDER BY s.confidence DESC
+       LIMIT $4
      ) t
      WHERE a.id = ANY($1::text[])
        AND a.embedding IS NOT NULL
-       AND t.confidence >= $3
      ON CONFLICT (article_id, interest_id)
        DO UPDATE SET confidence = EXCLUDED.confidence`,
     articleIds,
+    TOPIC_Z,
+    TOPIC_FLOOR,
     TOPIC_LIMIT,
-    TOPIC_THRESHOLD,
   );
 }
 
