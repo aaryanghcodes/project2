@@ -32,6 +32,24 @@ recommendation engine design, and the phased build order.
 - No paid APIs. If a task seems to need one, check PLAN.md — there is usually a
   free path already chosen.
 
+## Ingestion
+
+`npm run ingest` pulls the curated RSS list; `npm run ingest -- --fixtures`
+uses the checked-in synthetic corpus instead. Both are idempotent — articles
+are deduped on a hash of the canonicalized URL, so re-running inserts nothing.
+`npm run verify:ingest` prints what ingestion actually produced.
+
+**Every article and every interest must be embedded by the same provider.**
+Cosine similarity between a `model` vector and a `hashed` vector is a
+meaningless number that looks perfectly reasonable, and it silently governs
+topic tagging, clustering, and ranking. If you switch `EMBEDDING_PROVIDER`,
+re-run `npm run db:seed` *and* re-ingest. `verify:ingest` warns when the
+similarity distribution suggests a mismatch.
+
+`TOPIC_THRESHOLD` and `CLUSTER_THRESHOLD` in `src/lib/ingest/pipeline.ts` are
+provisional — they were chosen for bge-small without access to it. Validate
+them against `verify:ingest` output from a real run before relying on either.
+
 ## Verifying work
 
 `npm run typecheck && npm run lint && npm run build` should all pass. The

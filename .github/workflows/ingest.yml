@@ -1,0 +1,76 @@
+# Ingestion runs here rather than on Vercel because the embedding weights are
+# ~130MB — past the serverless bundle limit, and far too slow to cold-start on
+# every invocation. GitHub Actions gives us a free scheduler with no timeout
+# pressure and a cache that keeps the model warm between runs. See PLAN.md §2.
+name: Ingest articles
+
+on:
+  schedule:
+    # Every 30 minutes. GitHub queues scheduled jobs on shared runners, so the
+    # actual fire time drifts by several minutes under load — fine here, since
+    # nothing downstream assumes an exact cadence.
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+    inputs:
+      source:
+        description: "Which source to ingest from"
+        type: choice
+        options: [rss, fixtures]
+        default: rss
+
+# A slow run must not overlap the next scheduled one. Ingestion is idempotent,
+# so an overlap would be harmless but wasteful — it would re-embed nothing and
+# insert nothing while holding a runner.
+concurrency:
+  group: ingest
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # The model is ~130MB and does not change unless EMBEDDING_MODEL does,
+      # so it is keyed on the lockfile rather than downloaded every 30 minutes.
+      - name: Cache embedding model
+        uses: actions/cache@v4
+        with:
+          path: .model-cache
+          key: embedding-model-${{ hashFiles('package-lock.json') }}
+          restore-keys: embedding-model-
+
+      - run: npm ci
+
+      - name: Check database secret is present
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::DATABASE_URL secret is not set. Add it under"
+            echo "::error::Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+
+      - name: Ingest
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          INGEST_SOURCE: ${{ inputs.source || 'rss' }}
+        run: npm run ingest
+
+      # Prints the similarity distributions the tagging and clustering
+      # thresholds depend on. Those thresholds are still provisional — they
+      # were written without access to the real model — so this output is how
+      # they get validated on real data.
+      - name: Verify
+        if: always()
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: npm run verify:ingest

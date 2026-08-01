@@ -1,0 +1,296 @@
+{
+  "_comment": [
+    "SYNTHETIC DEMO DATA — every article below is invented.",
+    "",
+    "Publication names are fictional on purpose. A fixture set that put made-up",
+    "reporting under a real masthead would be a fabricated record the moment it",
+    "left the demo, so nothing here is attributed to a real outlet and every URL",
+    "points at example.com.",
+    "",
+    "publishedHoursAgo is relative so the fixture feed never looks stale: it is",
+    "resolved against the current time when loaded. Entries sharing a storyKey",
+    "are deliberate near-duplicates covering one event, which is what exercises",
+    "the clustering stage."
+  ],
+  "articles": [
+    {
+      "storyKey": "rate-decision",
+      "sourceName": "The Meridian Ledger",
+      "title": "Central bank holds rates steady, signals two cuts before year end",
+      "description": "Policymakers left the benchmark rate unchanged for a fourth consecutive meeting, but revised projections point to easing beginning in the autumn as inflation continues to cool toward the two percent target.",
+      "contentSnippet": "The decision was unanimous. In the accompanying statement, the committee described progress on inflation as \"meaningful but incomplete,\" language that economists read as a deliberate softening from the previous meeting. Bond markets moved sharply on the projections, with two-year yields falling twelve basis points within an hour of the release.",
+      "publishedHoursAgo": 3,
+      "quality": 0.85
+    },
+    {
+      "storyKey": "rate-decision",
+      "sourceName": "Harbourfront Business Review",
+      "title": "Rates unchanged as committee pencils in autumn easing",
+      "description": "The benchmark rate stays where it is for now, though updated forecasts released alongside the decision imply two quarter-point reductions before December.",
+      "contentSnippet": "Analysts had widely expected the hold. The surprise sat in the projection materials, where the median path shifted lower by half a percentage point compared with the previous round. Equity markets closed higher, with rate-sensitive sectors leading gains.",
+      "publishedHoursAgo": 3,
+      "quality": 0.8
+    },
+    {
+      "storyKey": "rate-decision",
+      "sourceName": "Cordell Wire",
+      "title": "Markets rally after central bank projections point to cuts",
+      "description": "Stocks climbed and yields fell after the rate decision, as investors repriced expectations for monetary policy over the second half of the year.",
+      "contentSnippet": "The reaction was swift across asset classes. Currency markets saw the largest single-day move in six weeks. Several strategists cautioned that the projections are conditional forecasts rather than commitments, and that incoming labour market data could easily shift the path again.",
+      "publishedHoursAgo": 2,
+      "quality": 0.75
+    },
+
+    {
+      "storyKey": "probe-arrival",
+      "sourceName": "Orbital Register",
+      "title": "Spacecraft enters orbit around asteroid after seven-year cruise",
+      "description": "The probe completed its orbital insertion burn overnight, becoming the first mission to closely survey a metal-rich body thought to be the exposed core of an early planetesimal.",
+      "contentSnippet": "Confirmation arrived as a series of tones from the spacecraft's low-gain antenna, cheered in the operations centre shortly after two in the morning. The science campaign begins in earnest next month, when the craft spirals down to a mapping orbit roughly seven hundred kilometres above the surface. Instruments include a multispectral imager, a gamma-ray spectrometer, and a magnetometer intended to settle whether the body retains a remnant magnetic field.",
+      "publishedHoursAgo": 9,
+      "quality": 0.9
+    },
+    {
+      "storyKey": "probe-arrival",
+      "sourceName": "Fieldnote Science",
+      "title": "Metal asteroid mission achieves orbit, begins survey campaign",
+      "description": "After a cruise lasting the better part of a decade, the spacecraft has successfully entered orbit and will spend the next eighteen months characterising the asteroid's composition and structure.",
+      "contentSnippet": "Researchers expect the mission to test a long-standing hypothesis: that the object is the stripped core of a body that lost its rocky mantle in an early collision. If confirmed, it would offer the only direct look at material otherwise buried thousands of kilometres beneath a planetary surface.",
+      "publishedHoursAgo": 8,
+      "quality": 0.8
+    },
+
+    {
+      "sourceName": "Ashgrove Technology Report",
+      "title": "Open-weight model matches frontier systems on reasoning benchmarks at a fraction of the size",
+      "description": "A newly released model with eight billion parameters performs comparably to systems many times larger on mathematical and coding evaluations, raising questions about how much scale actually buys.",
+      "contentSnippet": "The gains appear to come from training data curation and an extended reinforcement learning stage rather than architectural novelty. Independent evaluators have reproduced the headline numbers on two of the four benchmarks so far. Critics note that benchmark contamination remains difficult to rule out entirely, and that performance on held-out tasks tells a more modest story.",
+      "publishedHoursAgo": 5,
+      "quality": 0.8
+    },
+    {
+      "sourceName": "Ashgrove Technology Report",
+      "title": "Chip designer unveils architecture aimed squarely at inference costs",
+      "description": "The new design trades peak training throughput for memory bandwidth and energy efficiency, a bet that the economics of running models now matters more than the economics of building them.",
+      "contentSnippet": "Sampling begins next quarter. The company claims a threefold improvement in tokens per watt against its previous generation, though the comparison uses a quantised workload that flatters the new part. Cloud providers have reportedly been evaluating engineering samples since the spring.",
+      "publishedHoursAgo": 14,
+      "quality": 0.75
+    },
+    {
+      "sourceName": "The Bellwether",
+      "title": "Regulator opens inquiry into app store payment rules",
+      "description": "The investigation will examine whether requiring developers to use first-party payment processing constitutes an abuse of market position under competition law.",
+      "contentSnippet": "The inquiry follows complaints from a coalition of developers and a parallel case in another jurisdiction that concluded with substantial remedies last year. A finding could take eighteen months. The company said it would cooperate and defended the rules as necessary for user safety and fraud prevention.",
+      "publishedHoursAgo": 20,
+      "quality": 0.75
+    },
+    {
+      "sourceName": "Ashgrove Technology Report",
+      "title": "Security researchers disclose flaw in widely used encryption library",
+      "description": "The vulnerability allows a timing attack against key generation under specific conditions. Patches are available and maintainers urge immediate updates.",
+      "contentSnippet": "Exploitation requires local access and precise measurement, which limits practical risk for most deployments but raises real concerns for shared hosting environments. The library ships in a large share of server distributions, so the patch rollout will take months to reach the long tail.",
+      "publishedHoursAgo": 30,
+      "quality": 0.8
+    },
+
+    {
+      "sourceName": "Fieldnote Science",
+      "title": "Fossil find pushes back the record of powered flight in insects",
+      "description": "A specimen preserved in fine-grained shale carries wing structures that suggest active flight tens of millions of years earlier than the previous accepted date.",
+      "contentSnippet": "The preservation is exceptional, retaining venation detail and what the authors interpret as flight musculature attachment points. Not everyone is convinced; two independent palaeontologists noted that the features could equally reflect gliding, and that a single specimen carries limited weight against a well-established timeline.",
+      "publishedHoursAgo": 26,
+      "quality": 0.85
+    },
+    {
+      "sourceName": "Orbital Register",
+      "title": "Telescope survey finds far more rogue planets than models predict",
+      "description": "A microlensing survey has turned up an unexpected abundance of free-floating planetary-mass objects, complicating theories of how planetary systems shed their members.",
+      "contentSnippet": "The excess is most pronounced at the low-mass end, where detections are hardest and selection effects strongest. The team argues their sensitivity modelling accounts for this. If the result holds, the galaxy may contain more unbound planets than stars.",
+      "publishedHoursAgo": 40,
+      "quality": 0.85
+    },
+    {
+      "sourceName": "Fieldnote Science",
+      "title": "Coral restoration trial reports survival rates well above expectations",
+      "description": "Fragments raised in nurseries and transplanted onto degraded reef sections have survived three consecutive bleaching seasons, outperforming control plots by a wide margin.",
+      "contentSnippet": "Researchers attribute the result to selecting parent colonies that survived previous bleaching events, a form of assisted selection rather than engineering. The approach is labour-intensive and does not scale to reef systems measured in thousands of square kilometres, a limitation the authors state plainly.",
+      "publishedHoursAgo": 52,
+      "quality": 0.8
+    },
+
+    {
+      "sourceName": "Harbourfront Business Review",
+      "title": "Freight rates fall as new container capacity floods the market",
+      "description": "Vessels ordered during the boom are entering service into softer demand, pushing spot rates on major routes to their lowest level in three years.",
+      "contentSnippet": "Carriers have responded by idling older ships and slowing sailing speeds, measures that absorb capacity without permanently retiring it. Analysts expect the imbalance to persist through next year as the remaining orderbook delivers.",
+      "publishedHoursAgo": 11,
+      "quality": 0.8
+    },
+    {
+      "sourceName": "The Meridian Ledger",
+      "title": "Retail chain files for restructuring after failed refinancing",
+      "description": "The company will close roughly a fifth of its locations while it attempts to renegotiate lease obligations, blaming a debt load taken on during a leveraged buyout.",
+      "contentSnippet": "Suppliers are expected to take significant losses. The filing lists more than four thousand creditors. Employees at affected stores were told they would be paid through the closure period, though severance terms remain unsettled.",
+      "publishedHoursAgo": 34,
+      "quality": 0.8
+    },
+    {
+      "sourceName": "Cordell Wire",
+      "title": "Startup funding rebounds, but almost entirely at the late stage",
+      "description": "Total capital deployed rose for the second consecutive quarter while the number of individual deals continued to fall, concentrating money in fewer, larger rounds.",
+      "contentSnippet": "Seed-stage founders describe a market that feels nothing like the aggregate numbers suggest. The median time between rounds has stretched to twenty-six months, and down rounds now account for roughly a fifth of all follow-on financings.",
+      "publishedHoursAgo": 46,
+      "quality": 0.7
+    },
+
+    {
+      "sourceName": "Lantern Health Desk",
+      "title": "Large trial finds sleep intervention reduces cardiovascular events",
+      "description": "Participants receiving a structured behavioural sleep programme showed a measurable reduction in major cardiac events over four years compared with usual care.",
+      "contentSnippet": "The effect size is modest in absolute terms but notable for an intervention with no pharmacological component and few side effects. The authors caution that adherence in a trial setting exceeds what is typical in practice, and that the population skewed younger and healthier than the general patient group.",
+      "publishedHoursAgo": 16,
+      "quality": 0.85
+    },
+    {
+      "sourceName": "Lantern Health Desk",
+      "title": "Antibiotic resistance surveillance shows sharp regional divergence",
+      "description": "Resistance rates for several common pathogens have stabilised in some regions while climbing steeply in others, closely tracking differences in prescribing practice.",
+      "contentSnippet": "The report draws on isolates from more than nine hundred laboratories. Its authors argue the divergence is evidence that stewardship programmes work, and that the problem is one of implementation rather than inevitability.",
+      "publishedHoursAgo": 38,
+      "quality": 0.85
+    },
+    {
+      "sourceName": "The Bellwether",
+      "title": "Hospitals report staffing gaps easing for the first time since the pandemic",
+      "description": "Vacancy rates for nursing positions fell for a third consecutive quarter, though administrators warn the improvement is uneven and concentrated in urban centres.",
+      "contentSnippet": "Rural facilities report little change, and in several cases continued deterioration. Recruitment incentives that worked in metropolitan systems have not translated, and the pipeline of new graduates remains well below the level needed to offset retirements.",
+      "publishedHoursAgo": 58,
+      "quality": 0.75
+    },
+
+    {
+      "sourceName": "The Bellwether",
+      "title": "Budget negotiations stall over infrastructure spending formula",
+      "description": "Talks broke down late in the evening after negotiators failed to agree on how funds would be allocated between regions, pushing a resolution into next week at the earliest.",
+      "contentSnippet": "Both sides described the remaining gap as narrow but structural. The dispute centres on whether allocations should track population or existing infrastructure condition, a technical question with substantial distributional consequences.",
+      "publishedHoursAgo": 7,
+      "quality": 0.75
+    },
+    {
+      "sourceName": "Cordell Wire",
+      "title": "Court strikes down provisions of new data protection statute",
+      "description": "The ruling invalidates sections requiring platforms to verify user ages, finding them insufficiently narrow, while leaving the remainder of the law intact.",
+      "contentSnippet": "The decision is expected to be appealed. Civil liberties groups welcomed the outcome; child safety organisations called it a setback and urged legislators to redraft the provisions rather than abandon them.",
+      "publishedHoursAgo": 22,
+      "quality": 0.75
+    },
+    {
+      "sourceName": "The Meridian Ledger",
+      "title": "Election commission proposes overhaul of campaign disclosure rules",
+      "description": "The draft rules would lower reporting thresholds substantially and require faster disclosure of large contributions during the final weeks of a campaign.",
+      "contentSnippet": "The proposal enters a ninety-day comment period. Similar attempts have failed twice in the past decade, both times after objections that the compliance burden would fall hardest on smaller campaigns.",
+      "publishedHoursAgo": 44,
+      "quality": 0.8
+    },
+
+    {
+      "sourceName": "Cordell Wire",
+      "title": "Ceasefire agreement holds through first week despite border incidents",
+      "description": "Monitors reported several violations but no resumption of large-scale fighting, and humanitarian convoys reached two previously inaccessible areas.",
+      "contentSnippet": "Aid organisations describe conditions in the reached areas as severe, with shortages of clean water and medical supplies after months of isolation. Negotiators are due to reconvene to discuss a longer-term framework, though neither side has committed to a timetable.",
+      "publishedHoursAgo": 6,
+      "quality": 0.85
+    },
+    {
+      "sourceName": "The Meridian Ledger",
+      "title": "Record flooding displaces thousands as monsoon season intensifies",
+      "description": "Emergency services have evacuated low-lying districts after rivers exceeded their previous highest recorded levels, with further rainfall forecast.",
+      "contentSnippet": "Officials describe the response as stretched but functioning. Attention has turned to whether flood defences built after the last major event were adequate; engineers note they were designed against a return period that recent years have twice exceeded.",
+      "publishedHoursAgo": 13,
+      "quality": 0.85
+    },
+    {
+      "sourceName": "The Bellwether",
+      "title": "Trade bloc agrees framework on cross-border carbon pricing",
+      "description": "Member states reached provisional agreement on a mechanism that would apply a levy to imports from jurisdictions without comparable carbon costs.",
+      "contentSnippet": "The framework still requires ratification and contains extensive transitional exemptions. Trading partners have already signalled objections, and at least two have raised the prospect of a challenge at the trade organisation.",
+      "publishedHoursAgo": 28,
+      "quality": 0.8
+    },
+
+    {
+      "sourceName": "Touchline Weekly",
+      "title": "Underdogs reach final after extra-time winner ends record run",
+      "description": "A goal deep into extra time knocked out the tournament favourites, who had gone unbeaten in the competition for three seasons.",
+      "contentSnippet": "The winning side had been reduced to ten players early in the second half and spent much of the match defending. Their manager described the performance afterwards as \"the most disciplined ninety minutes I have seen from this group,\" before correcting himself on the count.",
+      "publishedHoursAgo": 4,
+      "quality": 0.75
+    },
+    {
+      "sourceName": "Touchline Weekly",
+      "title": "Marathon world record falls by eleven seconds in near-perfect conditions",
+      "description": "Cool temperatures and minimal wind produced one of the fastest fields in the race's history, with three runners finishing inside the previous record.",
+      "contentSnippet": "The winning time reopened a familiar debate about shoe technology, which the governing body currently regulates by sole thickness. The athlete dismissed the question, pointing out that everyone in the field wore comparable equipment.",
+      "publishedHoursAgo": 24,
+      "quality": 0.75
+    },
+    {
+      "sourceName": "Touchline Weekly",
+      "title": "League approves expansion to two additional cities",
+      "description": "Owners voted to add franchises beginning in the 2028 season, with expansion fees reported to be the highest in the league's history.",
+      "contentSnippet": "The vote was not unanimous. Dissenting owners raised concerns about diluting the talent pool and about media revenue being split more ways, an argument that has accompanied every previous expansion and prevailed in none of them.",
+      "publishedHoursAgo": 50,
+      "quality": 0.7
+    },
+
+    {
+      "sourceName": "Fold & Margin",
+      "title": "Debut novel wins major literary prize, judges praise its restraint",
+      "description": "The award went to a slim first novel about a family's dissolution, described by the chair of judges as a book that trusts its reader completely.",
+      "contentSnippet": "The author, who worked as a translator for two decades before publishing fiction, said the book took eleven years and was rejected by more than thirty houses. Sales rose sharply within hours of the announcement.",
+      "publishedHoursAgo": 18,
+      "quality": 0.8
+    },
+    {
+      "sourceName": "Fold & Margin",
+      "title": "Museum returns disputed collection after decade-long negotiation",
+      "description": "The agreement transfers ownership of more than two hundred objects while establishing a long-term loan arrangement that keeps a portion on display.",
+      "contentSnippet": "Both institutions framed the outcome as a template. Critics of the deal argue the loan provision undercuts the principle at stake; supporters counter that an agreement reached is worth more than a principle asserted indefinitely.",
+      "publishedHoursAgo": 36,
+      "quality": 0.8
+    },
+    {
+      "sourceName": "Fold & Margin",
+      "title": "Restored film screens publicly for the first time in sixty years",
+      "description": "A print thought lost was recovered from a private collection and digitally restored over four years, revealing roughly twenty minutes of previously unseen footage.",
+      "contentSnippet": "The restoration team worked from a badly degraded nitrate print, reconstructing damaged sections frame by frame. The recovered material substantially changes the film's third act, and by extension its reputation.",
+      "publishedHoursAgo": 62,
+      "quality": 0.75
+    },
+
+    {
+      "sourceName": "Common Table",
+      "title": "Why resting dough overnight changes more than texture",
+      "description": "Slow fermentation alters the flavour compounds in bread in ways a shorter rise cannot replicate, and the technique needs almost no active work.",
+      "contentSnippet": "The chemistry is straightforward: extended time at low temperature lets enzymes break starches into sugars while organic acids accumulate. The practical upshot is that the most effective step in home bread baking is the one that requires doing nothing at all.",
+      "publishedHoursAgo": 32,
+      "quality": 0.7
+    },
+    {
+      "sourceName": "Common Table",
+      "title": "The case for buying fewer, heavier pans",
+      "description": "Thin cookware heats unevenly and warps, and replacing it repeatedly costs more over a decade than buying well once.",
+      "contentSnippet": "Thermal mass is the whole argument. A heavy pan holds its temperature when cold food hits it, which is the difference between searing and steaming. The tradeoff is weight and preheating time, both of which are real and neither of which is a defect.",
+      "publishedHoursAgo": 56,
+      "quality": 0.65
+    },
+    {
+      "sourceName": "The Bellwether",
+      "title": "Remote work settles into a three-day pattern, survey finds",
+      "description": "After several years of adjustment, the distribution of in-office days has converged on a narrow band, with Tuesday through Thursday dominant almost everywhere.",
+      "contentSnippet": "The convergence appears to be self-reinforcing: employees come in on the days their colleagues do, and the days their colleagues choose are the ones already established. Attempts to mandate different patterns have largely failed to move the distribution.",
+      "publishedHoursAgo": 42,
+      "quality": 0.7
+    }
+  ]
+}
