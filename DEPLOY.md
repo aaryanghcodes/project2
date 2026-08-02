@@ -52,13 +52,20 @@ thresholds are still provisional — see the note at the end of this file.
 
 1. Go to <https://vercel.com> and sign up with GitHub.
 2. **Add New → Project**, and import `aaryanghcodes/project2`.
-3. Before clicking Deploy, open **Environment Variables** and add three:
+3. Before clicking Deploy, open **Environment Variables** and add two:
 
    | Name | Value |
    |---|---|
-   | `DATABASE_URL` | the Neon connection string from step 1 |
+   | `DATABASE_URL` | the same Neon connection string from step 1 |
    | `AUTH_SECRET` | run `openssl rand -base64 32` and paste the output |
-   | `AUTH_TRUST_HOST` | `true` |
+
+   `AUTH_TRUST_HOST` is **not** needed here — Auth.js trusts Vercel's host
+   automatically. It is only for self-hosting.
+
+   Use the same `DATABASE_URL` the ingest cron uses. Pointing Vercel at a
+   different database is the one mistake that produces a working site with a
+   permanently empty feed, because the articles land somewhere the app cannot
+   see.
 
 4. Set **Build Command** to:
 
@@ -66,14 +73,15 @@ thresholds are still provisional — see the note at the end of this file.
    npm run vercel-build
    ```
 
-   That runs `prisma migrate deploy && next build`, so your tables are created
-   on the first deploy automatically. (Vercel may detect this already — set it
-   explicitly to be sure.)
+   That runs `prisma migrate deploy && next build`. The setup workflow already
+   applied the migrations, so this is a no-op on the first deploy — it is here
+   so future schema changes ship with the code that needs them.
 
 5. Deploy. You get a URL like `project2-xyz.vercel.app`.
 
-Signup and login now work against the same database the setup workflow
-prepared, and the interest catalog is already populated.
+Sign up on the deployed site and you will land in the interest picker, then
+calibration, then your ranked feed — against the articles the cron has been
+collecting.
 
 ---
 
@@ -93,20 +101,36 @@ the database silently stale.
 
 ## What works after this
 
-- Landing page, account creation, sign in and out
-- Session-protected routes
-- 44 interests with real embeddings in a live database
+The whole loop, end to end:
 
-## What does not work yet
+- Sign up, sign in, session-protected routes
+- Interest picker over a 44-interest catalog with real embeddings
+- Calibration deck built for information rather than relevance
+- A taste profile clustered from your ratings
+- A ranked feed with story dedupe, exploration slots, and like/dislike that
+  moves the profile immediately
+- Articles refreshed every 30 minutes by the ingest cron
 
-- **No articles.** RSS ingestion is Phase 1, so the feed count stays at 0.
-- **No interest picker or calibration.** Phase 2.
-- **No ranking.** Phase 3.
+Two accounts that answer onboarding differently get measurably different
+feeds — verified at 0% overlap between opposed profiles.
 
-So this link demos the foundation, not the product. If you want something that
-*looks* like the finished product for a demo, say so — a clickable prototype of
-the full flow is a different and much faster piece of work than building
-Phases 1-3.
+## Known rough edges
+
+Real, and worth knowing before you show anyone:
+
+- **The "why am I seeing this" chip is sometimes wrong.** It names the nearest
+  tagged interest, and the catalog is thin in places — golf and athletics both
+  land on "Soccer" because there is no better option in the catalog.
+- **A narrow profile produces a monotonous feed.** Ranking is working as
+  specified, but a soccer-only profile gets a page of nothing but soccer. The
+  calibration deck applies MMR for variety; the feed does not yet.
+- **Relevance only outweighs recency by about 1.25x.** Two users with *similar*
+  interests may see more overlap than the 0% headline suggests.
+
+## Not built yet
+
+Phase 4 and 5 from PLAN.md: "why am I seeing this" as a real explanation,
+editing interests, reset profile, saved articles, email digest, PWA.
 
 ---
 
