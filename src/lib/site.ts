@@ -1,9 +1,10 @@
 /**
- * Product name and taglines live here so renaming is a one-file change.
- * "Tideline" is a placeholder — swap it for the real name when you have one.
+ * Product name and taglines live here so renaming stays a one-file change.
+ * Everything user-facing reads from this object rather than hardcoding the
+ * name in copy — keep it that way.
  */
 export const SITE = {
-  name: "Tideline",
+  name: "Winnow",
   tagline: "A news feed that learns what you actually read.",
   description:
     "Pick your interests, rate a few stories, and get a feed that sharpens every time you use it.",

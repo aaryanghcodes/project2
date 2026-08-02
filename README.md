@@ -1,9 +1,10 @@
-# Tideline
+# Winnow
 
 A personalized news feed. You pick a few interests, rate a short sample feed,
 and the ranking sharpens from there.
 
-`Tideline` is a placeholder name — change it in `src/lib/site.ts`.
+The name is set in `src/lib/site.ts`, which is the only place it lives — all
+user-facing copy reads from there.
 
 **[PLAN.md](./PLAN.md) is the design document.** It covers the product flow,
 the recommendation engine, and the phased build. Read it first.
