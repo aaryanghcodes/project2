@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
 
+import { Wordmark } from "@/components/ui";
 import { currentUser } from "@/lib/auth";
 import { buildFeedPage, recordImpressions } from "@/lib/feed/rank";
-import { SITE } from "@/lib/site";
 import { SignOutButton } from "./sign-out";
 import { FeedStream } from "./stream";
 
@@ -32,7 +32,7 @@ export default async function FeedPage() {
   return (
     <main className="mx-auto w-full max-w-2xl flex-1 px-6 py-10">
       <header className="flex items-center justify-between">
-        <span className="text-lg font-semibold tracking-tight">{SITE.name}</span>
+        <Wordmark />
         <SignOutButton />
       </header>
 

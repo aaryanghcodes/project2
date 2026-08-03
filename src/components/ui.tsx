@@ -1,6 +1,31 @@
+import Link from "next/link";
 import type { ComponentProps, ReactNode } from "react";
 
+import { SITE } from "@/lib/site";
+
 /** Small shared primitives. Deliberately plain — no component library yet. */
+
+/**
+ * The product name in the page header, always linking home.
+ *
+ * A component rather than markup repeated per page: a wordmark that navigates
+ * on some screens and not others is the kind of inconsistency nobody reports
+ * as a bug, they just quietly stop trusting it.
+ */
+export function Wordmark({ className = "" }: { className?: string }) {
+  return (
+    <Link
+      href="/"
+      className={
+        "text-lg font-semibold tracking-tight text-foreground " +
+        "transition-colors hover:text-accent " +
+        className
+      }
+    >
+      {SITE.name}
+    </Link>
+  );
+}
 
 export function Button({
   variant = "primary",

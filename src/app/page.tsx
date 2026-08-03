@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { Wordmark } from "@/components/ui";
 import { currentUserId } from "@/lib/auth";
 import { SITE } from "@/lib/site";
 
@@ -24,7 +25,7 @@ export default async function Home() {
   return (
     <main className="flex flex-1 flex-col">
       <header className="flex items-center justify-between px-6 py-5">
-        <span className="text-lg font-semibold tracking-tight">{SITE.name}</span>
+        <Wordmark />
         <nav className="flex items-center gap-2 text-sm">
           {signedIn ? (
             <Link
