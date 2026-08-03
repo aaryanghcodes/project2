@@ -11,9 +11,10 @@
 import { randomUUID } from "node:crypto";
 import { db } from "@/lib/db";
 import { articleEmbeddingText, embedBatch } from "@/lib/embeddings";
-import { toSqlVector } from "@/lib/vector";
+import { parseSqlVector, toSqlVector } from "@/lib/vector";
 import { urlHash } from "@/lib/news/normalize";
 import type { NewsSource, RawArticle } from "@/lib/news/types";
+import { sourceText, summarize } from "./summarize";
 
 /**
  * Minimum cosine similarity for an article to be tagged with an interest.
@@ -85,6 +86,7 @@ export interface IngestReport {
   fetched: number;
   duplicates: number;
   inserted: number;
+  summarized: number;
   tagged: number;
   clustersJoined: number;
   clustersCreated: number;
@@ -296,6 +298,65 @@ export async function clusterStories(
   return { joined, created };
 }
 
+/**
+ * Derive and store a summary for each article.
+ *
+ * Runs after storage rather than before, so it can work from the article's own
+ * embedding — the reference point for deciding which sentences are central.
+ *
+ * Failures are per-article and non-fatal: an article that cannot be summarised
+ * keeps a null summary and the UI falls back to the publisher's description.
+ * A summarisation problem should never cost us the article.
+ */
+export async function summarizeArticles(articleIds: string[]): Promise<number> {
+  if (articleIds.length === 0) return 0;
+
+  const rows = await db.$queryRawUnsafe<
+    {
+      id: string;
+      description: string | null;
+      content_snippet: string | null;
+      embedding: string;
+    }[]
+  >(
+    `SELECT id, description, content_snippet, embedding::text AS embedding
+     FROM articles
+     WHERE id = ANY($1::text[]) AND embedding IS NOT NULL`,
+    articleIds,
+  );
+
+  let written = 0;
+
+  for (const row of rows) {
+    const text = sourceText({
+      description: row.description,
+      contentSnippet: row.content_snippet,
+    });
+    if (!text) continue;
+
+    try {
+      const summary = await summarize(
+        { text, articleEmbedding: parseSqlVector(row.embedding) },
+        (texts) => embedBatch(texts),
+      );
+      if (!summary) continue;
+
+      await db.article.update({
+        where: { id: row.id },
+        data: { summary },
+      });
+      written++;
+    } catch (error) {
+      console.warn(
+        `[ingest] could not summarise ${row.id}: ` +
+          (error instanceof Error ? error.message : String(error)),
+      );
+    }
+  }
+
+  return written;
+}
+
 /** Run every stage. This is what the cron calls. */
 export async function ingest(source: NewsSource): Promise<IngestReport> {
   const startedAt = Date.now();
@@ -303,6 +364,7 @@ export async function ingest(source: NewsSource): Promise<IngestReport> {
   const { articles, errors } = await source.fetchLatest();
   const { fresh, duplicates } = await filterNew(articles);
   const ids = await embedAndStore(fresh);
+  const summarized = await summarizeArticles(ids);
   const tagged = await tagTopics(ids);
   const clusters = await clusterStories(ids);
 
@@ -310,6 +372,7 @@ export async function ingest(source: NewsSource): Promise<IngestReport> {
     fetched: articles.length,
     duplicates,
     inserted: ids.length,
+    summarized,
     tagged,
     clustersJoined: clusters.joined,
     clustersCreated: clusters.created,

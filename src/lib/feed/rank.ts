@@ -49,6 +49,7 @@ interface CandidateRow {
   id: string;
   title: string;
   description: string | null;
+  summary: string | null;
   url: string;
   source_name: string;
   image_url: string | null;
@@ -74,7 +75,7 @@ async function retrieveCandidates(
   const perCentroid = await Promise.all(
     positives.map((centroid) =>
       db.$queryRawUnsafe<CandidateRow[]>(
-        `SELECT a.id, a.title, a.description, a.url, a.source_name,
+        `SELECT a.id, a.title, a.description, a.summary, a.url, a.source_name,
                 a.image_url, a.published_at, a.story_cluster_id,
                 a.quality_score, a.embedding::text AS embedding
          FROM articles a
@@ -118,7 +119,7 @@ async function retrieveExploration(
   if (limit <= 0) return [];
 
   return db.$queryRawUnsafe<CandidateRow[]>(
-    `SELECT a.id, a.title, a.description, a.url, a.source_name,
+    `SELECT a.id, a.title, a.description, a.summary, a.url, a.source_name,
             a.image_url, a.published_at, a.story_cluster_id,
             a.quality_score, a.embedding::text AS embedding
      FROM articles a
@@ -166,7 +167,9 @@ function toFeedItem(
   return {
     id: row.id,
     title: row.title,
-    description: row.description,
+    // Derived summary when we have one; the publisher's description is the
+    // fallback, since it is better than showing nothing.
+    description: row.summary ?? row.description,
     url: row.url,
     sourceName: row.source_name,
     imageUrl: row.image_url,

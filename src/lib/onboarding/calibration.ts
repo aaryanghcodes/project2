@@ -54,6 +54,7 @@ interface Candidate {
   id: string;
   title: string;
   description: string | null;
+  summary: string | null;
   url: string;
   source_name: string;
   image_url: string | null;
@@ -117,7 +118,7 @@ async function candidatesForInterest(
   excludeIds: string[],
 ): Promise<Candidate[]> {
   return db.$queryRawUnsafe<Candidate[]>(
-    `SELECT a.id, a.title, a.description, a.url, a.source_name, a.image_url,
+    `SELECT a.id, a.title, a.description, a.summary, a.url, a.source_name, a.image_url,
             a.published_at, a.story_cluster_id,
             a.embedding::text AS embedding,
             1 - (a.embedding <=> i.seed_embedding) AS similarity
@@ -149,7 +150,7 @@ async function offProfileCandidates(
   excludeIds: string[],
 ): Promise<Candidate[]> {
   return db.$queryRawUnsafe<Candidate[]>(
-    `SELECT a.id, a.title, a.description, a.url, a.source_name, a.image_url,
+    `SELECT a.id, a.title, a.description, a.summary, a.url, a.source_name, a.image_url,
             a.published_at, a.story_cluster_id,
             a.embedding::text AS embedding,
             a.quality_score AS similarity
@@ -178,7 +179,9 @@ function toCard(
   return {
     id: row.id,
     title: row.title,
-    description: row.description,
+    // Derived summary when we have one; the publisher's description is the
+    // fallback, since it is better than showing nothing.
+    description: row.summary ?? row.description,
     url: row.url,
     sourceName: row.source_name,
     imageUrl: row.image_url,

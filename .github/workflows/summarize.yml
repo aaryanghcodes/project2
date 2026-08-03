@@ -1,0 +1,60 @@
+# Generates summaries for articles already stored.
+#
+# Summarisation runs at ingest, so this is only needed for articles collected
+# before the feature existed, or after changing the selection heuristics in
+# src/lib/ingest/summarize.ts.
+#
+# Prints a before/after sample at the end — the output is the point, since
+# whether this reads better is a qualitative question that a row count cannot
+# answer.
+name: Backfill summaries
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "missing = only articles with no summary; all = regenerate everything"
+        type: choice
+        options: [missing, all]
+        default: missing
+
+concurrency:
+  group: summarize
+  cancel-in-progress: false
+
+jobs:
+  summarize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Cache embedding model
+        uses: actions/cache@v4
+        with:
+          path: .model-cache
+          key: embedding-model-${{ hashFiles('package-lock.json') }}
+          restore-keys: embedding-model-
+
+      - run: npm ci
+
+      - name: Apply migrations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: npx prisma migrate deploy
+
+      - name: Backfill
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          if [ "${{ inputs.mode }}" = "all" ]; then
+            npm run summarize:backfill -- --all
+          else
+            npm run summarize:backfill
+          fi

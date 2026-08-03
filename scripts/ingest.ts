@@ -34,7 +34,8 @@ async function main(): Promise<void> {
 
   console.log(
     `[ingest] fetched=${report.fetched} new=${report.inserted} ` +
-      `duplicate=${report.duplicates} topics=${report.tagged} ` +
+      `duplicate=${report.duplicates} summarized=${report.summarized} ` +
+      `topics=${report.tagged} ` +
       `clusters(joined=${report.clustersJoined} new=${report.clustersCreated}) ` +
       `in ${(report.durationMs / 1000).toFixed(1)}s`,
   );

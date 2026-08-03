@@ -18,7 +18,8 @@
     "verify:ingest": "tsx scripts/verify-ingest.ts",
     "retag": "tsx scripts/retag.ts",
     "verify:onboarding": "tsx scripts/verify-onboarding.ts",
-    "verify:feed": "tsx scripts/verify-feed.ts"
+    "verify:feed": "tsx scripts/verify-feed.ts",
+    "summarize:backfill": "tsx scripts/summarize-backfill.ts"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.2.0",
