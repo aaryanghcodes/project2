@@ -44,11 +44,16 @@ jobs:
 
       - run: npm ci
 
-      - name: Apply migrations
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        run: npx prisma migrate deploy
-
+      # Deliberately does NOT run `prisma migrate deploy`.
+      #
+      # Vercel already applies migrations on every deploy via `vercel-build`.
+      # When this workflow ran them too, the two competed for the same Postgres
+      # advisory lock and both failed with P1002 — a push triggers a Vercel
+      # build, and firing this workflow shortly after lands inside that window.
+      # Migrations need exactly one owner, and the deploy is it.
+      #
+      # If the schema this needs has not shipped yet, the backfill fails on the
+      # missing column with a clear error, which is the right failure.
       - name: Backfill
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
