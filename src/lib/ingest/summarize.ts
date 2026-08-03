@@ -82,6 +82,23 @@ function isLowValue(sentence: string): boolean {
 }
 
 /**
+ * Cut to a length without splitting a word.
+ *
+ * A hard slice produces "was once criti…", which reads as a rendering bug
+ * rather than as deliberate truncation, and undermines trust in the rest of
+ * the text on the card.
+ */
+function truncateAtWord(text: string, limit: number): string {
+  if (text.length <= limit) return text;
+  const cut = text.slice(0, limit);
+  const lastSpace = cut.lastIndexOf(" ");
+  // Only back off to the word boundary when it is reasonably close; a string
+  // with no spaces near the limit would otherwise lose most of its content.
+  const trimmed = lastSpace > limit * 0.6 ? cut.slice(0, lastSpace) : cut;
+  return trimmed.replace(/[,;:.\-–—\s]+$/, "") + "…";
+}
+
+/**
  * Assemble the text to summarise, from everything we stored.
  *
  * Both fields go in, description first. An earlier version summarised only the
@@ -171,7 +188,7 @@ export async function summarize(
       if (chosen.length > 0) break;
       // Nothing fits yet — take a truncated first sentence rather than
       // returning nothing at all.
-      return entry.sentence.slice(0, MAX_SUMMARY_CHARS).trimEnd() + "…";
+      return truncateAtWord(entry.sentence, MAX_SUMMARY_CHARS);
     }
     chosen.push(entry);
     budget -= entry.sentence.length + 1;
