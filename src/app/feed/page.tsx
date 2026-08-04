@@ -30,7 +30,9 @@ export default async function FeedPage() {
   await recordImpressions(user.id, items, 0);
 
   return (
-    <main className="mx-auto w-full max-w-2xl flex-1 px-6 py-10">
+    // Narrow on phones, where a single column is the right reading experience;
+    // wide on desktop, where a 672px column left most of the screen empty.
+    <main className="mx-auto w-full max-w-2xl flex-1 px-6 py-10 lg:max-w-6xl">
       <header className="flex items-center justify-between">
         <Wordmark />
         <SignOutButton />

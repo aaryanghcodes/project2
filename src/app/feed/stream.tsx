@@ -135,27 +135,51 @@ export function FeedStream({ initialItems }: { initialItems: FeedItem[] }) {
         </div>
       ) : null}
 
-      <ul className="space-y-5">
+      {/* One column on phones, two from md, three on large screens.
+          `items-start` so each card hugs its own content: cards in a row vary a
+          lot in height depending on whether the article had an image, and
+          stretching them to match left a large blank gap inside the shorter
+          ones. Ragged bottoms read better than hollow cards. */}
+      <ul className="grid grid-cols-1 items-start gap-5 md:grid-cols-2 xl:grid-cols-3">
         {items.map((item) => {
           const reaction = reactions[item.id];
           return (
             <li
               key={item.id}
-              className="overflow-hidden rounded-2xl border border-border-base bg-surface shadow-[var(--shadow)]"
+              className="flex flex-col overflow-hidden rounded-2xl border border-border-base bg-surface shadow-[var(--shadow)]"
             >
               {item.imageUrl ? (
-                // Plain <img>: RSS images come from arbitrary hosts, and
-                // next/image would need each one allow-listed up front.
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={item.imageUrl}
-                  alt=""
-                  loading="lazy"
-                  className="h-44 w-full object-cover"
-                />
+                // A fixed aspect box with object-contain rather than
+                // object-cover: feed images arrive at wildly different
+                // dimensions, and cropping them to a uniform height cut the
+                // subject out of portrait and square images. Letterboxing on a
+                // neutral panel shows the whole picture instead.
+                //
+                // The grid also helps the other half of the problem — many RSS
+                // thumbnails are only a few hundred pixels wide, and stretching
+                // one across a full-width column was what made them look soft.
+                // A narrower card asks less of the source image.
+                // `absolute inset-0` on the image, not just `h-full`: as a flex
+                // child, a box whose height comes from aspect-ratio while its
+                // content asks for `h-full` is circular, and the browser
+                // resolves it in favour of the image's natural height. A
+                // portrait image then rendered ~850px tall and stretched the
+                // whole grid row. Taking the image out of flow lets the
+                // aspect-ratio actually decide.
+                <div className="relative aspect-[16/9] w-full shrink-0 bg-surface-raised">
+                  {/* Plain <img>: RSS images come from arbitrary hosts, and
+                      next/image would need each one allow-listed up front. */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={item.imageUrl}
+                    alt=""
+                    loading="lazy"
+                    className="absolute inset-0 h-full w-full object-contain"
+                  />
+                </div>
               ) : null}
 
-              <div className="p-5">
+              <div className="flex flex-1 flex-col p-5">
                 <div className="flex flex-wrap items-center gap-2 text-xs">
                   <span className="font-medium text-muted">{item.sourceName}</span>
                   <span className="text-subtle" aria-hidden="true">·</span>
@@ -190,7 +214,10 @@ export function FeedStream({ initialItems }: { initialItems: FeedItem[] }) {
                   </p>
                 ) : null}
 
-                <div className="mt-4 flex items-center gap-1">
+                {/* mt-auto pins the reactions to the bottom of the card, so
+                    they line up across a row whose titles wrapped to different
+                    heights. */}
+                <div className="mt-auto flex items-center gap-1 pt-4">
                   <ReactionButton
                     active={reaction === "LIKE"}
                     onClick={() => react(item.id, "LIKE")}
@@ -219,7 +246,7 @@ export function FeedStream({ initialItems }: { initialItems: FeedItem[] }) {
         })}
       </ul>
 
-      <div ref={sentinel} className="py-8 text-center text-sm text-subtle">
+      <div ref={sentinel} className="py-10 text-center text-sm text-subtle">
         {cursor === null
           ? "That is everything for now."
           : loading
