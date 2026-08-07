@@ -302,9 +302,9 @@ export function FeedStream({ initialItems }: { initialItems: FeedItem[] }) {
  * Replaces the card once it has been rated.
  *
  * Standing in for the article makes the feedback unmissable and clears the
- * item out of the way, which is what someone wants after a dislike. A like is
- * a slightly odd case — the card you just endorsed disappears — so the panel
- * keeps a link to read it, and undo restores the card either way.
+ * item out of the way, which is what someone wants after a dislike. The cost
+ * is that the card you just rated is gone, so the panel always offers a way
+ * into the article itself, and undo restores the card.
  */
 function ReactionPanel({
   reaction,
@@ -335,26 +335,26 @@ function ReactionPanel({
           ? "Thanks — we'll show more like this."
           : "Got it — we'll show fewer like this."}
       </p>
-      <div className="flex items-center gap-3 text-xs">
-        <button
-          type="button"
-          onClick={onUndo}
-          className="rounded-lg px-2.5 py-1.5 text-neutral-300 underline-offset-2 hover:text-white hover:underline"
-        >
-          Undo
-        </button>
-        {liked ? (
-          <a
-            href={url}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={onOpen}
-            className="rounded-lg px-2.5 py-1.5 text-neutral-300 underline-offset-2 hover:text-white hover:underline"
-          >
-            Read it
-          </a>
-        ) : null}
-      </div>
+      <button
+        type="button"
+        onClick={onUndo}
+        className="rounded-lg px-2.5 py-1 text-xs text-neutral-300 underline-offset-2 hover:text-white hover:underline"
+      >
+        Undo
+      </button>
+
+      {/* On the dislike panel too, not just the like: rating something down
+          is not the same as refusing to read it, and a rated card that can no
+          longer be opened turns the buttons into a trap. */}
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={onOpen}
+        className="mt-1 w-full rounded-lg border border-neutral-700 px-3 py-2 text-sm font-medium text-neutral-100 transition-colors hover:border-neutral-500 hover:bg-neutral-800"
+      >
+        Continue reading this article
+      </a>
     </div>
   );
 }
