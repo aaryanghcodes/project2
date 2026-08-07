@@ -1,8 +1,11 @@
 "use client";
 
 import {
+  createContext,
   useCallback,
+  useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
   useSyncExternalStore,
@@ -30,8 +33,24 @@ import { SaveButton } from "@/components/save-button";
  * fine pointer.
  */
 
-const OPEN_DELAY_MS = 350;
-const CLOSE_DELAY_MS = 180;
+/**
+ * Long enough that reading a headline and moving on does not open anything.
+ * The previous 350ms fired while the cursor was still travelling, which is
+ * what made the panels feel like they were ambushing the reader.
+ */
+const OPEN_DELAY_MS = 650;
+
+const CLOSE_DELAY_MS = 200;
+
+/**
+ * How long after the last scroll event hovering stays disabled.
+ *
+ * Scrolling drags the cursor across whatever happens to pass under it. Those
+ * are not hovers in any meaningful sense — the reader is moving the page, not
+ * pointing at a headline — so the whole mechanism is inert until the page has
+ * been still for a moment.
+ */
+const SCROLL_QUIET_MS = 400;
 
 interface SimilarArticle {
   id: string;
@@ -81,6 +100,66 @@ function useFinePointer(): boolean {
   );
 }
 
+/**
+ * Tracks whether the page has been still recently.
+ *
+ * A module-level timestamp rather than per-card state: every card would
+ * otherwise attach its own scroll listener, and twelve listeners firing on
+ * every scroll frame is exactly the kind of thing that makes a feed feel
+ * heavy.
+ */
+let lastScrollAt = 0;
+let scrollListenerAttached = false;
+
+function ensureScrollListener() {
+  if (scrollListenerAttached || typeof window === "undefined") return;
+  scrollListenerAttached = true;
+  window.addEventListener(
+    "scroll",
+    () => {
+      lastScrollAt = Date.now();
+    },
+    { passive: true },
+  );
+}
+
+function pageIsStill(): boolean {
+  return Date.now() - lastScrollAt > SCROLL_QUIET_MS;
+}
+
+/**
+ * Handlers for the element that opens the preview.
+ *
+ * Provided through context so the panel can be positioned against the whole
+ * card while only the headline actually triggers it. Hovering the image or the
+ * summary does nothing — the headline is what a reader points at when they are
+ * deciding whether to open something.
+ */
+interface TriggerHandlers {
+  onMouseEnter: () => void;
+  onMouseLeave: () => void;
+  onFocus: () => void;
+  onBlur: () => void;
+}
+
+const TriggerContext = createContext<TriggerHandlers | null>(null);
+
+/** Wrap the element that should open the preview — in practice, the title. */
+export function PreviewTrigger({ children }: { children: React.ReactNode }) {
+  const handlers = useContext(TriggerContext);
+  if (!handlers) return <>{children}</>;
+  return (
+    <span
+      onMouseEnter={handlers.onMouseEnter}
+      onMouseLeave={handlers.onMouseLeave}
+      onFocus={handlers.onFocus}
+      onBlur={handlers.onBlur}
+    >
+      {children}
+    </span>
+  );
+}
+
 export function HoverPreview({
   articleId,
   children,
@@ -119,28 +198,47 @@ export function HoverPreview({
     }
   }, [articleId]);
 
-  function onEnter() {
-    if (!finePointer || failed) return;
-    clearTimers();
-    openTimer.current = setTimeout(() => {
-      setOpen(true);
-      void load();
-    }, OPEN_DELAY_MS);
-  }
+  const handlers = useMemo<TriggerHandlers>(() => {
+    function onEnter() {
+      if (!finePointer || failed) return;
+      ensureScrollListener();
+      clearTimers();
 
-  function onLeave() {
-    clearTimers();
-    closeTimer.current = setTimeout(() => setOpen(false), CLOSE_DELAY_MS);
-  }
+      openTimer.current = setTimeout(() => {
+        // Re-checked at fire time, not just on entry: the reader may have
+        // started scrolling during the delay, and opening a panel under a
+        // moving page is the exact behaviour being fixed.
+        if (!pageIsStill()) return;
+        setOpen(true);
+        void load();
+      }, OPEN_DELAY_MS);
+    }
+
+    function onLeave() {
+      clearTimers();
+      closeTimer.current = setTimeout(() => setOpen(false), CLOSE_DELAY_MS);
+    }
+
+    return {
+      onMouseEnter: onEnter,
+      onMouseLeave: onLeave,
+      onFocus: onEnter,
+      onBlur: onLeave,
+    };
+  }, [finePointer, failed, load]);
+
+  // Any scroll dismisses an open panel outright. Waiting for the cursor to
+  // leave would leave it hanging over content it no longer belongs to.
+  useEffect(() => {
+    if (!open) return;
+    const onScroll = () => setOpen(false);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [open]);
 
   return (
-    <div
-      className="relative"
-      onMouseEnter={onEnter}
-      onMouseLeave={onLeave}
-      onFocusCapture={onEnter}
-      onBlurCapture={onLeave}
-    >
+    <TriggerContext.Provider value={handlers}>
+    <div className="relative">
       {children}
 
       {open && finePointer ? (
@@ -150,6 +248,11 @@ export function HoverPreview({
           // into it to reach the actions and the suggestions.
           className="absolute inset-x-0 top-0 z-30 w-full min-w-[22rem] animate-[fadeIn_120ms_ease-out] rounded-2xl border border-border-strong bg-surface p-5 shadow-2xl"
           style={{ transform: "translateY(-0.5rem)" }}
+          // The panel keeps itself open while the cursor is inside it, so the
+          // reader can travel from the headline into the actions and the
+          // suggestions without it collapsing on the way.
+          onMouseEnter={handlers.onMouseEnter}
+          onMouseLeave={handlers.onMouseLeave}
           role="dialog"
           aria-label={`Preview: ${data?.title ?? "loading"}`}
         >
@@ -276,6 +379,7 @@ export function HoverPreview({
         </div>
       ) : null}
     </div>
+    </TriggerContext.Provider>
   );
 }
 

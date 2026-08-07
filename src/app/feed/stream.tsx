@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { FormError } from "@/components/ui";
 import { SaveButton } from "@/components/save-button";
 import { useReadingTracker } from "@/lib/feed/use-reading-tracker";
-import { HoverPreview } from "@/components/hover-preview";
+import { HoverPreview, PreviewTrigger } from "@/components/hover-preview";
 
 interface FeedItem {
   id: string;
@@ -201,16 +201,22 @@ export function FeedStream({ initialItems }: { initialItems: FeedItem[] }) {
                   ) : null}
                 </div>
 
+                {/* Only the headline opens the preview. Hovering the image
+                    or the summary does nothing — the headline is what a reader
+                    points at when deciding whether to open something, and
+                    making the whole card a target meant scrolling fired them. */}
                 <h2 className="mt-2 text-lg font-semibold leading-snug tracking-tight">
-                  <a
-                    href={item.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={() => trackOpen(item.id)}
-                    className="hover:text-accent"
-                  >
-                    {item.title}
-                  </a>
+                  <PreviewTrigger>
+                    <a
+                      href={item.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => trackOpen(item.id)}
+                      className="hover:text-accent"
+                    >
+                      {item.title}
+                    </a>
+                  </PreviewTrigger>
                 </h2>
 
                 {item.description ? (
