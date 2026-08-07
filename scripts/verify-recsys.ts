@@ -104,16 +104,29 @@ async function main(): Promise<void> {
         score: 1 - i / vectors.length,
       }));
 
-      const plain = candidates.slice(0, 8).map((c) => c.embedding);
-      const diverse = selectByMmr(candidates, 8, 0.75).map((i) => vectors[i]);
+      const plainIdx = [0, 1, 2, 3, 4, 5, 6, 7];
+      const mmrIdx = selectByMmr(candidates, 8, 0.75);
 
-      const plainSim = meanPairwise(plain);
-      const diverseSim = meanPairwise(diverse);
+      const plainSim = meanPairwise(plainIdx.map((i) => vectors[i]));
+      const diverseSim = meanPairwise(mmrIdx.map((i) => vectors[i]));
+
       console.log(`\n3. diversity`);
+      console.log(`   plain top-8 indices: ${plainIdx.join(",")}`);
+      console.log(`   MMR   top-8 indices: ${mmrIdx.join(",")}`);
       console.log(
-        `   plain top-8 mean pairwise similarity: ${plainSim.toFixed(4)}`,
+        `   plain mean pairwise similarity: ${plainSim.toFixed(4)}  ` +
+          `MMR: ${diverseSim.toFixed(4)}`,
       );
-      console.log(`   MMR top-8:                            ${diverseSim.toFixed(4)}`);
+
+      const changed = mmrIdx.filter((i) => !plainIdx.includes(i)).length;
+      console.log(`   MMR swapped ${changed} of 8 items`);
+
+      if (changed === 0) {
+        throw new Error(
+          "MMR selected exactly the plain-ranking items — the diversity term " +
+            "is too weak relative to the score term to reorder anything.",
+        );
+      }
       if (diverseSim > plainSim) {
         throw new Error("MMR produced a *less* varied page than plain ranking.");
       }
