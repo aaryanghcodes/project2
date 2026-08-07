@@ -78,3 +78,36 @@ export async function POST(request: Request) {
 
   return NextResponse.json({ ok: true, profile });
 }
+
+/**
+ * Remove a reaction — the undo behind the feed's confirmation panel.
+ *
+ * Note what this does *not* do: the online centroid nudge that a like or
+ * dislike triggered is not reversed, because `c ← normalize(c + η(a - c))` is
+ * not cleanly invertible once other ratings have landed on top of it. Deleting
+ * the row means the next full profile rebuild is correct, and the nudge's
+ * effect washes out then. For a mis-tap that is the right trade; pretending to
+ * undo it exactly would be a lie.
+ */
+export async function DELETE(request: Request) {
+  const user = await currentUser();
+  if (!user) {
+    return NextResponse.json({ error: "Not signed in." }, { status: 401 });
+  }
+
+  const params = new URL(request.url).searchParams;
+  const articleId = params.get("articleId");
+  if (!articleId) {
+    return NextResponse.json({ error: "articleId is required." }, { status: 400 });
+  }
+
+  const result = await db.interaction.deleteMany({
+    where: {
+      userId: user.id,
+      articleId,
+      type: { in: ["LIKE", "DISLIKE"] },
+    },
+  });
+
+  return NextResponse.json({ ok: true, removed: result.count });
+}

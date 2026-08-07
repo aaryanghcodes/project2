@@ -93,21 +93,12 @@ export function FeedStream({ initialItems }: { initialItems: FeedItem[] }) {
   }, [loadMore, cursor]);
 
   async function react(articleId: string, type: Reaction) {
-    // Toggle off if the same reaction is tapped twice.
-    const next = reactions[articleId] === type ? null : type;
-    setReactions((current) => {
-      const copy = { ...current };
-      if (next) copy[articleId] = next;
-      else delete copy[articleId];
-      return copy;
-    });
-
-    if (!next) return;
+    setReactions((current) => ({ ...current, [articleId]: type }));
 
     const response = await fetch("/api/interactions", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ articleId, type: next, context: "FEED" }),
+      body: JSON.stringify({ articleId, type, context: "FEED" }),
     });
 
     if (!response.ok) {
@@ -117,6 +108,33 @@ export function FeedStream({ initialItems }: { initialItems: FeedItem[] }) {
         return copy;
       });
       setError("That reaction did not save.");
+    }
+  }
+
+  /**
+   * Put the card back.
+   *
+   * Worth having even though the profile nudge is not perfectly reversible
+   * (see the DELETE handler): a feed where one mis-tap permanently removes an
+   * article you wanted, with no way back, teaches people to stop using the
+   * buttons at all — which costs far more signal than the occasional stray
+   * rating.
+   */
+  async function undoReaction(articleId: string) {
+    const previous = reactions[articleId];
+    setReactions((current) => {
+      const copy = { ...current };
+      delete copy[articleId];
+      return copy;
+    });
+
+    const response = await fetch(
+      `/api/interactions?articleId=${encodeURIComponent(articleId)}`,
+      { method: "DELETE" },
+    );
+    if (!response.ok && previous) {
+      setReactions((current) => ({ ...current, [articleId]: previous }));
+      setError("Could not undo that.");
     }
   }
 
@@ -150,6 +168,14 @@ export function FeedStream({ initialItems }: { initialItems: FeedItem[] }) {
           const reaction = reactions[item.id];
           return (
             <li key={item.id}>
+              {reaction ? (
+                <ReactionPanel
+                  reaction={reaction}
+                  url={item.url}
+                  onUndo={() => void undoReaction(item.id)}
+                  onOpen={() => trackOpen(item.id)}
+                />
+              ) : (
               <HoverPreview articleId={item.id}>
               <div className="flex h-full flex-col overflow-hidden rounded-2xl border border-border-base bg-surface shadow-[var(--shadow)]">
               {item.imageUrl ? (
@@ -255,6 +281,7 @@ export function FeedStream({ initialItems }: { initialItems: FeedItem[] }) {
               </div>
               </div>
               </HoverPreview>
+              )}
             </li>
           );
         })}
@@ -266,6 +293,67 @@ export function FeedStream({ initialItems }: { initialItems: FeedItem[] }) {
           : loading
             ? "Loading…"
             : " "}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Replaces the card once it has been rated.
+ *
+ * Standing in for the article makes the feedback unmissable and clears the
+ * item out of the way, which is what someone wants after a dislike. A like is
+ * a slightly odd case — the card you just endorsed disappears — so the panel
+ * keeps a link to read it, and undo restores the card either way.
+ */
+function ReactionPanel({
+  reaction,
+  url,
+  onUndo,
+  onOpen,
+}: {
+  reaction: Reaction;
+  url: string;
+  onUndo: () => void;
+  onOpen: () => void;
+}) {
+  const liked = reaction === "LIKE";
+
+  return (
+    <div
+      role="status"
+      // Explicit near-black rather than a theme token: `foreground` inverts in
+      // dark mode, which would turn this into a white box there. The panel is
+      // meant to read as a deliberate blank in both themes.
+      className="flex min-h-[11rem] flex-col items-center justify-center gap-3 rounded-2xl bg-neutral-900 p-6 text-center text-neutral-50 shadow-[var(--shadow)]"
+    >
+      <span aria-hidden="true" className="text-2xl">
+        {liked ? "👍" : "👎"}
+      </span>
+      <p className="text-sm font-medium leading-relaxed">
+        {liked
+          ? "Thanks — we'll show more like this."
+          : "Got it — we'll show fewer like this."}
+      </p>
+      <div className="flex items-center gap-3 text-xs">
+        <button
+          type="button"
+          onClick={onUndo}
+          className="rounded-lg px-2.5 py-1.5 text-neutral-300 underline-offset-2 hover:text-white hover:underline"
+        >
+          Undo
+        </button>
+        {liked ? (
+          <a
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={onOpen}
+            className="rounded-lg px-2.5 py-1.5 text-neutral-300 underline-offset-2 hover:text-white hover:underline"
+          >
+            Read it
+          </a>
+        ) : null}
       </div>
     </div>
   );
