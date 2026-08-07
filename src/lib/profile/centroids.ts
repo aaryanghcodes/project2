@@ -167,16 +167,22 @@ export async function rebuildCentroidsFromVectors(
 /**
  * Fetch the embeddings of articles a user reacted to a given way.
  *
- * LIKE and SAVE both count as positive evidence; DISLIKE and HIDE as negative.
- * CLICK and DWELL are deliberately excluded — PLAN.md §5 defers implicit
- * signals until there is real traffic to calibrate their weight against.
+ * LIKE is the only positive evidence; DISLIKE and HIDE are negative.
+ *
+ * SAVE used to count as positive here and deliberately no longer does. Saving
+ * is a filing action, not an endorsement — people bookmark things to read
+ * later, to disagree with, or because a colleague sent it — so treating it as
+ * a like quietly dragged profiles toward whatever someone meant to get back
+ * to. Bookmarks now live in `saved_articles` and never reach this query.
+ *
+ * CLICK and DWELL are excluded for a different reason: PLAN.md §5 defers
+ * implicit signals until there is real traffic to calibrate their weight.
  */
 export async function interactionVectors(
   userId: string,
   polarity: Polarity,
 ): Promise<number[][]> {
-  const types =
-    polarity === "POS" ? ["LIKE", "SAVE"] : ["DISLIKE", "HIDE"];
+  const types = polarity === "POS" ? ["LIKE"] : ["DISLIKE", "HIDE"];
 
   const rows = await db.$queryRaw<{ vector: string }[]>`
     SELECT a.embedding::text AS vector

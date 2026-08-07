@@ -19,7 +19,8 @@
     "retag": "tsx scripts/retag.ts",
     "verify:onboarding": "tsx scripts/verify-onboarding.ts",
     "verify:feed": "tsx scripts/verify-feed.ts",
-    "summarize:backfill": "tsx scripts/summarize-backfill.ts"
+    "summarize:backfill": "tsx scripts/summarize-backfill.ts",
+    "verify:saved": "tsx scripts/verify-saved.ts"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.2.0",

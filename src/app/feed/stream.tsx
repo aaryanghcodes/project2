@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { FormError } from "@/components/ui";
+import { SaveButton } from "@/components/save-button";
 
 interface FeedItem {
   id: string;
@@ -14,9 +15,10 @@ interface FeedItem {
   publishedAt: string;
   reason: string | null;
   exploration: boolean;
+  saved: boolean;
 }
 
-type Reaction = "LIKE" | "DISLIKE" | "SAVE";
+type Reaction = "LIKE" | "DISLIKE";
 
 function relativeTime(iso: string): string {
   const hours = Math.round((Date.now() - new Date(iso).getTime()) / 3_600_000);
@@ -232,13 +234,14 @@ export function FeedStream({ initialItems }: { initialItems: FeedItem[] }) {
                   >
                     👎
                   </ReactionButton>
-                  <ReactionButton
-                    active={reaction === "SAVE"}
-                    onClick={() => react(item.id, "SAVE")}
-                    label="Save"
-                  >
-                    🔖
-                  </ReactionButton>
+                  {/* Sits with the reactions but is not one: it posts to
+                      /api/saved, never to /api/interactions, so it cannot
+                      reach the profile. */}
+                  <SaveButton
+                    articleId={item.id}
+                    initialSaved={item.saved}
+                    className="ml-auto"
+                  />
                 </div>
               </div>
             </li>

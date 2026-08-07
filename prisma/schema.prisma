@@ -59,8 +59,45 @@ model User {
   interactions Interaction[]
   centroids    UserTasteCentroid[]
   impressions  Impression[]
+  saved        SavedArticle[]
 
   @@map("users")
+}
+
+/// A bookmark. Deliberately NOT an Interaction.
+///
+/// Saving is a filing action, not a taste signal — people save things to read
+/// later, to argue with, or because someone sent it to them. Storing it here
+/// rather than as an Interaction row makes it structurally impossible for a
+/// save to reach the centroid rebuild, which reads only from `interactions`.
+/// That is a stronger guarantee than remembering to exclude a type.
+///
+/// The denormalized columns are a snapshot taken at save time. Articles are
+/// pruned as they age and publishers edit or withdraw stories, and a reading
+/// list that empties itself is not a reading list. `articleId` therefore goes
+/// null rather than cascading, and the saved row survives on its own copy.
+model SavedArticle {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  articleId String?  @map("article_id")
+  savedAt   DateTime @default(now()) @map("saved_at")
+
+  title       String
+  url         String
+  sourceName  String    @map("source_name")
+  summary     String?
+  imageUrl    String?   @map("image_url")
+  publishedAt DateTime  @map("published_at")
+  /// Topic labels copied at save time, so filtering still works after the
+  /// article row (and its article_topics) is gone.
+  topics      String[]
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  article Article? @relation(fields: [articleId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, articleId])
+  @@index([userId, savedAt(sort: Desc)])
+  @@map("saved_articles")
 }
 
 /// The checkbox catalog shown during onboarding. `description` is the sentence
@@ -131,6 +168,7 @@ model Article {
   topics       ArticleTopic[]
   interactions Interaction[]
   impressions  Impression[]
+  saves        SavedArticle[]
 
   @@index([publishedAt(sort: Desc)])
   @@index([storyClusterId])

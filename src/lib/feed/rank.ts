@@ -11,6 +11,7 @@
 import { db } from "@/lib/db";
 import { toSqlVector, parseSqlVector } from "@/lib/vector";
 import { loadCentroids, type Centroid } from "@/lib/profile/centroids";
+import { savedArticleIds } from "@/lib/saved/saved";
 import { scoreArticle, type ScoredArticle } from "./scoring";
 
 export const PAGE_SIZE = 12;
@@ -43,6 +44,8 @@ export interface FeedItem {
   reason: string | null;
   exploration: boolean;
   score: number;
+  /** Whether this user has bookmarked it. Display only — never scored. */
+  saved: boolean;
 }
 
 interface CandidateRow {
@@ -178,6 +181,9 @@ function toFeedItem(
     reason,
     exploration: scored.exploration,
     score: scored.score,
+    // Filled in by buildFeedPage once the whole page is known, so saved state
+    // costs one query per page rather than one per card.
+    saved: false,
   };
 }
 
@@ -285,6 +291,11 @@ export async function buildFeedPage(
   // Interleave rather than appending, so exploration is not a predictable
   // block at the bottom that users learn to scroll past.
   const shuffled = interleaveExploration(items);
+
+  // Saved state is a display concern, resolved after ranking. It is read here
+  // and nowhere in the scoring path — bookmarks must not move the feed.
+  const saved = await savedArticleIds(userId, shuffled.map((item) => item.id));
+  for (const item of shuffled) item.saved = saved.has(item.id);
 
   return {
     items: shuffled,

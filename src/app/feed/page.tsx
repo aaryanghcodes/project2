@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { Wordmark } from "@/components/ui";
+import { Nav } from "@/components/nav";
 import { currentUser } from "@/lib/auth";
 import { buildFeedPage, recordImpressions } from "@/lib/feed/rank";
 import { SignOutButton } from "./sign-out";
@@ -33,8 +34,11 @@ export default async function FeedPage() {
     // Narrow on phones, where a single column is the right reading experience;
     // wide on desktop, where a 672px column left most of the screen empty.
     <main className="mx-auto w-full max-w-2xl flex-1 px-6 py-10 lg:max-w-6xl">
-      <header className="flex items-center justify-between">
-        <Wordmark />
+      <header className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-5">
+          <Wordmark />
+          <Nav />
+        </div>
         <SignOutButton />
       </header>
 

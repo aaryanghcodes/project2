@@ -29,11 +29,13 @@ export async function POST(request: Request) {
   // The unique constraint is (userId, articleId, type), so changing a rating
   // from like to dislike would otherwise leave both rows in place and feed
   // contradictory evidence into the centroid rebuild. Opposites are cleared.
+  // SAVE is absent on purpose. Bookmarking is orthogonal to taste — saving an
+  // article you disagree with should not silently retract the dislike, and
+  // disliking something should not un-save it from your reading list.
   const opposites: Record<string, string[]> = {
     LIKE: ["DISLIKE", "HIDE"],
-    SAVE: ["DISLIKE", "HIDE"],
-    DISLIKE: ["LIKE", "SAVE"],
-    HIDE: ["LIKE", "SAVE"],
+    DISLIKE: ["LIKE"],
+    HIDE: ["LIKE"],
   };
 
   await db.$transaction(async (tx) => {
