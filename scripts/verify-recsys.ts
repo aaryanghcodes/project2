@@ -98,39 +98,51 @@ async function main(): Promise<void> {
     `;
     if (sample.length >= 12) {
       const vectors = sample.map((r) => parseSqlVector(r.embedding));
-      const candidates = vectors.map((embedding, i) => ({
-        embedding,
-        // Descending scores, so plain ranking takes a contiguous prefix.
-        score: 1 - i / vectors.length,
-      }));
 
-      const plainIdx = [0, 1, 2, 3, 4, 5, 6, 7];
+      // Scores are similarity to a query vector rather than a synthetic ramp.
+      // This matters: an evenly-spaced ramp across 40 items spreads scores far
+      // wider than real ranking ever does, and the diversity term then cannot
+      // overcome the gaps. Real candidate scores cluster tightly, which is the
+      // regime MMR is meant to operate in.
+      const query = vectors[0];
+      const candidates = vectors
+        .map((embedding) => ({
+          embedding,
+          score: cosineSimilarity(embedding, query),
+        }))
+        .sort((a, b) => b.score - a.score);
+
+      // lambda 1.0 is pure ranking, so this is the same code path with the
+      // diversity term switched off — an apples-to-apples baseline rather than
+      // a hand-built "plain" list.
+      const plainIdx = selectByMmr(candidates, 8, 1.0);
       const mmrIdx = selectByMmr(candidates, 8, 0.75);
 
-      const plainSim = meanPairwise(plainIdx.map((i) => vectors[i]));
-      const diverseSim = meanPairwise(mmrIdx.map((i) => vectors[i]));
+      const plainSim = meanPairwise(plainIdx.map((i) => candidates[i].embedding));
+      const diverseSim = meanPairwise(mmrIdx.map((i) => candidates[i].embedding));
+      const changed = mmrIdx.filter((i) => !plainIdx.includes(i)).length;
 
       console.log(`\n3. diversity`);
-      console.log(`   plain top-8 indices: ${plainIdx.join(",")}`);
-      console.log(`   MMR   top-8 indices: ${mmrIdx.join(",")}`);
+      console.log(`   ranking only (λ=1.0): ${plainIdx.join(",")}`);
+      console.log(`   with MMR    (λ=0.75): ${mmrIdx.join(",")}`);
       console.log(
-        `   plain mean pairwise similarity: ${plainSim.toFixed(4)}  ` +
-          `MMR: ${diverseSim.toFixed(4)}`,
+        `   mean pairwise similarity ${plainSim.toFixed(4)} → ${diverseSim.toFixed(4)}` +
+          `  (${changed} of 8 items swapped)`,
       );
 
-      const changed = mmrIdx.filter((i) => !plainIdx.includes(i)).length;
-      console.log(`   MMR swapped ${changed} of 8 items`);
-
-      if (changed === 0) {
+      if (changed === 0 && diverseSim >= plainSim) {
         throw new Error(
-          "MMR selected exactly the plain-ranking items — the diversity term " +
-            "is too weak relative to the score term to reorder anything.",
+          "MMR changed neither the selection nor its redundancy — the " +
+            "diversity term is not doing anything.",
         );
       }
       if (diverseSim > plainSim) {
         throw new Error("MMR produced a *less* varied page than plain ranking.");
       }
-      console.log("   ✓ MMR reduces redundancy");
+      console.log(
+        `   ✓ MMR reduced redundancy by ` +
+          `${(((plainSim - diverseSim) / plainSim) * 100).toFixed(1)}%`,
+      );
     }
 
     // ---- 4. cold start: a new article is recommendable immediately -------
