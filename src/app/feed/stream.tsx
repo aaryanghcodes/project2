@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { FormError } from "@/components/ui";
 import { SaveButton } from "@/components/save-button";
 import { useReadingTracker } from "@/lib/feed/use-reading-tracker";
+import { HoverPreview } from "@/components/hover-preview";
 
 interface FeedItem {
   id: string;
@@ -148,10 +149,9 @@ export function FeedStream({ initialItems }: { initialItems: FeedItem[] }) {
         {items.map((item) => {
           const reaction = reactions[item.id];
           return (
-            <li
-              key={item.id}
-              className="flex flex-col overflow-hidden rounded-2xl border border-border-base bg-surface shadow-[var(--shadow)]"
-            >
+            <li key={item.id}>
+              <HoverPreview articleId={item.id}>
+              <div className="flex h-full flex-col overflow-hidden rounded-2xl border border-border-base bg-surface shadow-[var(--shadow)]">
               {item.imageUrl ? (
                 // A fixed aspect box with object-contain rather than
                 // object-cover: feed images arrive at wildly different
@@ -247,6 +247,8 @@ export function FeedStream({ initialItems }: { initialItems: FeedItem[] }) {
                   />
                 </div>
               </div>
+              </div>
+              </HoverPreview>
             </li>
           );
         })}

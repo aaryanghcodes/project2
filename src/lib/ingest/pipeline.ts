@@ -14,7 +14,11 @@ import { articleEmbeddingText, embedBatch } from "@/lib/embeddings";
 import { parseSqlVector, toSqlVector } from "@/lib/vector";
 import { urlHash } from "@/lib/news/normalize";
 import type { NewsSource, RawArticle } from "@/lib/news/types";
-import { sourceText, summarize } from "./summarize";
+import {
+  sourceText,
+  summarize,
+  MAX_LONG_SUMMARY_CHARS,
+} from "./summarize";
 import { extractMetadata } from "./keywords";
 
 /**
@@ -337,10 +341,24 @@ export async function summarizeArticles(articleIds: string[]): Promise<number> {
     if (!text) continue;
 
     try {
+      const embedding = parseSqlVector(row.embedding);
       const summary = await summarize(
-        { text, articleEmbedding: parseSqlVector(row.embedding) },
+        { text, articleEmbedding: embedding },
         (texts) => embedBatch(texts),
       );
+
+      // The preview extract, from the same selection mechanism with a wider
+      // budget. Precomputed rather than derived on request because the web app
+      // never loads the embedding model — see PLAN.md §2.
+      const longSummary = await summarize(
+        { text, articleEmbedding: embedding },
+        (texts) => embedBatch(texts),
+        MAX_LONG_SUMMARY_CHARS,
+      );
+
+      // Words in the text we hold. A lower bound, since contentSnippet is
+      // capped at ingest — the UI shows it with a "~" for exactly that reason.
+      const wordCount = (text.match(/\S+/g) ?? []).length;
 
       // Metadata is derived in the same pass because it reads the same text.
       // Unlike the summary it is never null-checked away — an article with no
@@ -355,7 +373,13 @@ export async function summarizeArticles(articleIds: string[]): Promise<number> {
 
       await db.article.update({
         where: { id: row.id },
-        data: { ...(summary ? { summary } : {}), keywords, entities },
+        data: {
+          ...(summary ? { summary } : {}),
+          ...(longSummary ? { longSummary } : {}),
+          keywords,
+          entities,
+          wordCount,
+        },
       });
       written++;
     } catch (error) {

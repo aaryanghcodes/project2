@@ -174,6 +174,17 @@ model Article {
   /// article (see src/lib/ingest/summarize.ts), and the UI falls back to
   /// `description` when it is null.
   summary        String?
+
+  /// A longer extract for the hover preview — the same selection mechanism as
+  /// `summary` with a wider budget, so the preview adds detail rather than
+  /// repeating the card verbatim.
+  longSummary    String?  @map("long_summary")
+
+  /// Words in the text we actually hold, for the reading-time estimate. A
+  /// lower bound: `contentSnippet` is capped at ingest, so a long article
+  /// reads as shorter than it is. Surfaced with a "~" for that reason.
+  wordCount      Int?     @map("word_count")
+
   imageUrl       String?  @map("image_url")
   publishedAt    DateTime @map("published_at")
   fetchedAt      DateTime @default(now()) @map("fetched_at")

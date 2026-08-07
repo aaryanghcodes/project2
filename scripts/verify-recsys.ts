@@ -22,6 +22,7 @@ import {
   READ_THRESHOLD_MS,
 } from "../src/lib/profile/reading-signals";
 import { extractKeywords, extractEntities } from "../src/lib/ingest/keywords";
+import { similarArticles } from "../src/lib/feed/similar";
 import { cosineSimilarity, parseSqlVector } from "../src/lib/vector";
 
 /** Mean pairwise similarity — lower means a more varied page. */
@@ -230,6 +231,59 @@ async function main(): Promise<void> {
     if (rebuilt.implicit === 0) {
       throw new Error("Reading signals were recorded but the rebuild ignored them.");
     }
+
+    // ---- 7. similar articles for the hover preview ---------------------
+    const anchor = await db.$queryRaw<{ id: string; title: string; source_name: string; story_cluster_id: string | null }[]>`
+      SELECT id, title, source_name, story_cluster_id FROM articles
+      WHERE embedding IS NOT NULL ORDER BY published_at DESC LIMIT 1
+    `;
+    if (anchor.length > 0) {
+      const similar = await similarArticles(user.id, anchor[0].id, 3);
+      console.log(`\n7. similar articles`);
+      console.log(`   anchor: ${anchor[0].title.slice(0, 60)}`);
+      for (const item of similar) {
+        console.log(
+          `   → ${item.similarity.toFixed(3)}  ${item.sourceName.padEnd(24)} ` +
+            `${item.title.slice(0, 48)}`,
+        );
+      }
+
+      if (similar.some((s) => s.id === anchor[0].id)) {
+        throw new Error("Similar articles included the anchor itself.");
+      }
+      if (similar.some((s) => s.similarity > 0.9)) {
+        throw new Error(
+          "A near-duplicate was suggested — related-but-not-identical is the point.",
+        );
+      }
+      const sources = new Set(similar.map((s) => s.sourceName));
+      if (similar.length > 1 && sources.size !== similar.length) {
+        throw new Error("Two suggestions came from the same source.");
+      }
+      if (similar.length > 0) {
+        console.log(
+          `   ✓ ${similar.length} suggestion(s), all distinct sources, none a near-duplicate`,
+        );
+      }
+    }
+
+    // ---- 8. hovering must not touch the profile ------------------------
+    // The preview endpoint is read-only by construction; this asserts that the
+    // reading-signal tables are untouched by anything the preview path does.
+    const interactionsBefore = await db.interaction.count({ where: { userId: user.id } });
+    const impressionsBefore = await db.impression.count({ where: { userId: user.id } });
+    if (anchor.length > 0) await similarArticles(user.id, anchor[0].id, 3);
+    const interactionsAfter = await db.interaction.count({ where: { userId: user.id } });
+    const impressionsAfter = await db.impression.count({ where: { userId: user.id } });
+
+    console.log(`\n8. hover isolation`);
+    if (interactionsAfter !== interactionsBefore || impressionsAfter !== impressionsBefore) {
+      throw new Error(
+        "Building a preview wrote interaction or impression rows — hovering " +
+          "would then feed the recommendation profile.",
+      );
+    }
+    console.log("   ✓ preview path wrote no interactions and no impressions");
 
     console.log(`\n✓ Recommendation system checks passed.`);
   } finally {

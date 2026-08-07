@@ -22,7 +22,14 @@
 import { cosineSimilarity } from "@/lib/vector";
 
 /** Target length. Long enough to be informative, short enough for a card. */
-const MAX_SUMMARY_CHARS = 280;
+export const MAX_SUMMARY_CHARS = 280;
+
+/**
+ * Budget for the hover preview. Roughly triple the card, which is enough for
+ * the surrounding detail — who, where, what happens next — without becoming a
+ * wall of text that is slower to scan than the article itself.
+ */
+export const MAX_LONG_SUMMARY_CHARS = 800;
 
 /** Sentences shorter than this are fragments — captions, bylines, stubs. */
 const MIN_SENTENCE_CHARS = 40;
@@ -152,6 +159,7 @@ export interface SummaryCandidate {
 export async function summarize(
   candidate: SummaryCandidate,
   embedBatch: (texts: string[]) => Promise<number[][]>,
+  maxChars: number = MAX_SUMMARY_CHARS,
 ): Promise<string | null> {
   const sentences = splitSentences(candidate.text).filter(
     (sentence) =>
@@ -165,7 +173,7 @@ export async function summarize(
   // A single usable sentence needs no ranking, and embedding it would be
   // wasted work on the most common case in short feed items.
   if (sentences.length === 1) {
-    return sentences[0].slice(0, MAX_SUMMARY_CHARS);
+    return truncateAtWord(sentences[0], maxChars);
   }
 
   const vectors = await embedBatch(sentences);
@@ -179,7 +187,7 @@ export async function summarize(
   }));
 
   const chosen: { sentence: string; index: number }[] = [];
-  let budget = MAX_SUMMARY_CHARS;
+  let budget = maxChars;
 
   for (const entry of [...scored].sort((a, b) => b.score - a.score)) {
     // +1 for the joining space. Stop rather than skip-and-continue: a summary
@@ -188,11 +196,13 @@ export async function summarize(
       if (chosen.length > 0) break;
       // Nothing fits yet — take a truncated first sentence rather than
       // returning nothing at all.
-      return truncateAtWord(entry.sentence, MAX_SUMMARY_CHARS);
+      return truncateAtWord(entry.sentence, maxChars);
     }
     chosen.push(entry);
     budget -= entry.sentence.length + 1;
-    if (chosen.length >= 3) break;
+    // Scale the sentence cap with the budget: a card wants two or three,
+    // a preview can carry more without becoming unscannable.
+    if (chosen.length >= (maxChars > MAX_SUMMARY_CHARS ? 6 : 3)) break;
   }
 
   if (chosen.length === 0) return null;
