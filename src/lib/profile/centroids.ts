@@ -9,6 +9,7 @@
 import { db } from "@/lib/db";
 import { cosineSimilarity, normalize, parseSqlVector, toSqlVector } from "@/lib/vector";
 import { clusterCountFor, kmeans } from "./kmeans";
+import { ignoredVectors, readingSignalVectors } from "./reading-signals";
 
 export type Polarity = "POS" | "NEG";
 
@@ -175,8 +176,10 @@ export async function rebuildCentroidsFromVectors(
  * a like quietly dragged profiles toward whatever someone meant to get back
  * to. Bookmarks now live in `saved_articles` and never reach this query.
  *
- * CLICK and DWELL are excluded for a different reason: PLAN.md §5 defers
- * implicit signals until there is real traffic to calibrate their weight.
+ * CLICK and DWELL are excluded *here* but not from the profile: implicit
+ * reading behaviour is a separate, much quieter channel handled by
+ * ./reading-signals.ts. Keeping the two apart means a flood of weak implicit
+ * evidence can never drown out the handful of times someone pressed a button.
  */
 export async function interactionVectors(
   userId: string,
@@ -288,22 +291,72 @@ export async function nudgeCentroidToward(
 export async function rebuildProfile(
   userId: string,
   fallbackInterestIds: string[] = [],
-): Promise<{ positive: number; negative: number }> {
+  options: { includeReadingSignals?: boolean } = {},
+): Promise<{ positive: number; negative: number; implicit: number }> {
+  const { includeReadingSignals = true } = options;
+
   const [positiveVectors, negativeVectors] = await Promise.all([
     interactionVectors(userId, "POS"),
     interactionVectors(userId, "NEG"),
   ]);
 
+  const [implicitPositive, implicitNegative, ignored] = includeReadingSignals
+    ? await Promise.all([
+        readingSignalVectors(userId, "POS"),
+        readingSignalVectors(userId, "NEG"),
+        ignoredVectors(userId),
+      ])
+    : [[], [], []];
+
+  const positiveInput = [
+    ...positiveVectors.map((vector) => ({ vector, weight: 1 })),
+    ...implicitPositive,
+  ];
+  const negativeInput = [
+    ...negativeVectors.map((vector) => ({ vector, weight: 1 })),
+    ...implicitNegative,
+    ...ignored,
+  ];
+
   const positive =
-    positiveVectors.length > 0
-      ? await rebuildCentroidsFromVectors(userId, "POS", positiveVectors)
+    positiveInput.length > 0
+      ? await rebuildCentroidsFromVectors(userId, "POS", expand(positiveInput))
       : await seedCentroidsFromInterests(userId, fallbackInterestIds);
 
   const negative = await rebuildCentroidsFromVectors(
     userId,
     "NEG",
-    negativeVectors,
+    expand(negativeInput),
   );
 
-  return { positive, negative };
+  return {
+    positive,
+    negative,
+    implicit: implicitPositive.length + implicitNegative.length + ignored.length,
+  };
+}
+
+/**
+ * Turn weighted evidence into the flat vector list k-means expects.
+ *
+ * k-means gives every point equal say, so weight is expressed as multiplicity:
+ * an explicit like (1.0) contributes three copies, a long read (0.35) one, an
+ * ignored impression (0.05) none until several accumulate. Crude, but it keeps
+ * the clustering code weight-agnostic, and it makes the relative influence of
+ * each signal legible as a small integer rather than hidden in a distance
+ * function.
+ *
+ * The resolution is deliberately low. A finer scale would imply these weights
+ * are calibrated, and they are not — there is no traffic yet to fit them
+ * against.
+ */
+const WEIGHT_RESOLUTION = 3;
+
+function expand(entries: { vector: number[]; weight: number }[]): number[][] {
+  const out: number[][] = [];
+  for (const entry of entries) {
+    const copies = Math.round(entry.weight * WEIGHT_RESOLUTION);
+    for (let i = 0; i < copies; i++) out.push(entry.vector);
+  }
+  return out;
 }

@@ -15,7 +15,7 @@ on:
       check:
         description: "Which acceptance check to run"
         type: choice
-        options: [all, onboarding, feed, ingest]
+        options: [all, onboarding, feed, ingest, recsys]
         default: all
 
 concurrency:
@@ -54,3 +54,13 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: npm run verify:feed
+
+      # Diversity and muting are the two checks that mean nothing against the
+      # lexical fallback — hashed vectors are near-orthogonal, so there is no
+      # redundancy for MMR to remove, and the local corpus has no topic tags to
+      # mute. This is where those assertions actually bite.
+      - name: Recommendation system
+        if: inputs.check == 'all' || inputs.check == 'recsys'
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: npm run verify:recsys

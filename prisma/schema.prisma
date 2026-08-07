@@ -60,8 +60,28 @@ model User {
   centroids    UserTasteCentroid[]
   impressions  Impression[]
   saved        SavedArticle[]
+  mutedTopics  MutedTopic[]
 
   @@map("users")
+}
+
+/// A topic the user has explicitly asked not to see.
+///
+/// Kept separate from a low interest weight because the two mean different
+/// things: a weak weight says "rarely relevant to me", a mute says "never show
+/// me this". Muting filters at retrieval rather than nudging a score, because
+/// a suppression the user asked for out loud should not be something a strong
+/// enough match can overrule.
+model MutedTopic {
+  userId     String   @map("user_id")
+  interestId String   @map("interest_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  interest Interest @relation(fields: [interestId], references: [id], onDelete: Cascade)
+
+  @@id([userId, interestId])
+  @@map("muted_topics")
 }
 
 /// A bookmark. Deliberately NOT an Interaction.
@@ -116,6 +136,7 @@ model Interest {
 
   users  UserInterest[]
   topics ArticleTopic[]
+  mutedBy MutedTopic[]
 
   @@index([group, sortOrder])
   @@map("interests")
@@ -156,6 +177,11 @@ model Article {
   imageUrl       String?  @map("image_url")
   publishedAt    DateTime @map("published_at")
   fetchedAt      DateTime @default(now()) @map("fetched_at")
+  /// Statistical metadata for explanation and filtering, not for ranking —
+  /// ranking runs on embeddings. See src/lib/ingest/keywords.ts.
+  keywords       String[]
+  entities       String[]
+
   lang           String   @default("en")
   qualityScore   Float    @default(0.5) @map("quality_score")
 

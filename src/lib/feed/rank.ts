@@ -12,6 +12,7 @@ import { db } from "@/lib/db";
 import { toSqlVector, parseSqlVector } from "@/lib/vector";
 import { loadCentroids, type Centroid } from "@/lib/profile/centroids";
 import { savedArticleIds } from "@/lib/saved/saved";
+import { selectByMmr } from "./mmr";
 import { scoreArticle, type ScoredArticle } from "./scoring";
 
 export const PAGE_SIZE = 12;
@@ -30,6 +31,17 @@ const MAX_AGE_DAYS = 7;
  * costs a little relevance now to keep the profile improving later.
  */
 const EXPLORATION_RATIO = 0.15;
+
+/**
+ * Relevance-versus-diversity balance for the ranked slots.
+ *
+ * At 0.75 relevance still dominates — this is a personalized feed, not a
+ * shuffle — but it is low enough to break up the failure this fixes: a
+ * soccer-heavy profile was getting pages of nothing but soccer, because every
+ * one of those articles genuinely was the best remaining match. Ranking alone
+ * has no notion of "you have seen four of these already".
+ */
+const FEED_MMR_LAMBDA = 0.75;
 
 export interface FeedItem {
   id: string;
@@ -88,6 +100,15 @@ async function retrieveCandidates(
              SELECT 1 FROM impressions i
              WHERE i.article_id = a.id AND i.user_id = $3
            )
+           -- Muted topics are filtered here rather than penalised in scoring:
+           -- an explicit "never show me this" should not be overridable by a
+           -- strong enough similarity score.
+           AND NOT EXISTS (
+             SELECT 1 FROM article_topics t
+             JOIN muted_topics m
+               ON m.interest_id = t.interest_id AND m.user_id = $3
+             WHERE t.article_id = a.id
+           )
          ORDER BY a.embedding <=> $1::vector
          LIMIT $4`,
         toSqlVector(centroid.vector),
@@ -132,6 +153,12 @@ async function retrieveExploration(
        AND NOT EXISTS (
          SELECT 1 FROM impressions i
          WHERE i.article_id = a.id AND i.user_id = $3
+       )
+       AND NOT EXISTS (
+         SELECT 1 FROM article_topics t
+         JOIN muted_topics m
+           ON m.interest_id = t.interest_id AND m.user_id = $3
+         WHERE t.article_id = a.id
        )
      ORDER BY a.quality_score DESC, a.published_at DESC
      LIMIT $4`,
@@ -245,7 +272,20 @@ export async function buildFeedPage(
   const explorationSlots = Math.max(1, Math.round(pageSize * EXPLORATION_RATIO));
   const rankedSlots = pageSize - explorationSlots;
 
-  const page = ranked.slice(offset, offset + rankedSlots);
+  // Diversity pass. MMR runs over a pool several times the page size rather
+  // than the whole candidate set: reranking everything would let a merely
+  // adequate article from an unrepresented topic outrank a genuinely strong
+  // one, which is diversity bought at too high a price.
+  const pool = ranked.slice(offset, offset + rankedSlots * 4);
+  const selected = selectByMmr(
+    pool.map((entry) => ({
+      embedding: parseSqlVector(entry.row.embedding),
+      score: entry.scored.score,
+    })),
+    rankedSlots,
+    FEED_MMR_LAMBDA,
+  );
+  const page = selected.map((index) => pool[index]);
 
   const exploration = (
     await retrieveExploration(

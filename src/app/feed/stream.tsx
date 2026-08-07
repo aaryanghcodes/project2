@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { FormError } from "@/components/ui";
 import { SaveButton } from "@/components/save-button";
+import { useReadingTracker } from "@/lib/feed/use-reading-tracker";
 
 interface FeedItem {
   id: string;
@@ -36,6 +37,7 @@ export function FeedStream({ initialItems }: { initialItems: FeedItem[] }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [reactions, setReactions] = useState<Record<string, Reaction>>({});
+  const { trackOpen } = useReadingTracker();
   const sentinel = useRef<HTMLDivElement>(null);
 
   // Stable across the session so impressions can be grouped by visit later.
@@ -204,6 +206,7 @@ export function FeedStream({ initialItems }: { initialItems: FeedItem[] }) {
                     href={item.url}
                     target="_blank"
                     rel="noopener noreferrer"
+                    onClick={() => trackOpen(item.id)}
                     className="hover:text-accent"
                   >
                     {item.title}

@@ -15,6 +15,7 @@ import { parseSqlVector, toSqlVector } from "@/lib/vector";
 import { urlHash } from "@/lib/news/normalize";
 import type { NewsSource, RawArticle } from "@/lib/news/types";
 import { sourceText, summarize } from "./summarize";
+import { extractMetadata } from "./keywords";
 
 /**
  * Minimum cosine similarity for an article to be tagged with an interest.
@@ -314,12 +315,13 @@ export async function summarizeArticles(articleIds: string[]): Promise<number> {
   const rows = await db.$queryRawUnsafe<
     {
       id: string;
+      title: string;
       description: string | null;
       content_snippet: string | null;
       embedding: string;
     }[]
   >(
-    `SELECT id, description, content_snippet, embedding::text AS embedding
+    `SELECT id, title, description, content_snippet, embedding::text AS embedding
      FROM articles
      WHERE id = ANY($1::text[]) AND embedding IS NOT NULL`,
     articleIds,
@@ -339,11 +341,21 @@ export async function summarizeArticles(articleIds: string[]): Promise<number> {
         { text, articleEmbedding: parseSqlVector(row.embedding) },
         (texts) => embedBatch(texts),
       );
-      if (!summary) continue;
+
+      // Metadata is derived in the same pass because it reads the same text.
+      // Unlike the summary it is never null-checked away — an article with no
+      // usable summary can still have keywords worth filtering on.
+      const { keywords, entities } = extractMetadata({
+        title: row.title,
+        description: row.description,
+        contentSnippet: row.content_snippet,
+      });
+
+      if (!summary && keywords.length === 0 && entities.length === 0) continue;
 
       await db.article.update({
         where: { id: row.id },
-        data: { summary },
+        data: { ...(summary ? { summary } : {}), keywords, entities },
       });
       written++;
     } catch (error) {

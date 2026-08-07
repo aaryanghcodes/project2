@@ -20,7 +20,8 @@
     "verify:onboarding": "tsx scripts/verify-onboarding.ts",
     "verify:feed": "tsx scripts/verify-feed.ts",
     "summarize:backfill": "tsx scripts/summarize-backfill.ts",
-    "verify:saved": "tsx scripts/verify-saved.ts"
+    "verify:saved": "tsx scripts/verify-saved.ts",
+    "verify:recsys": "tsx scripts/verify-recsys.ts"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.2.0",
